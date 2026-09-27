@@ -94,7 +94,6 @@
 /obj/item/gun/energy/modular_laser_rifle/Initialize(mapload)
 	. = ..()
 	chat_color = DEFAULT_RUNECHAT_GUN_COLOR
-	chat_color_darkened = DEFAULT_RUNECHAT_GUN_COLOR
 	last_charge = cell.charge
 	create_weapon_mode_stuff()
 
@@ -349,6 +348,9 @@
 /obj/item/gun/energy/modular_laser_rifle/carbine/emp_act(severity)
 	. = ..()
 	speak_up("emp", TRUE) // She gets very upset if you emp her
+
+/obj/item/gun/energy/modular_laser_rifle/carbine/pinvanguard
+	pin = /obj/item/firing_pin/explorer
 
 #undef LONG_MOD_LASER_SPEECH
 #undef SHORT_MOD_LASER_SPEECH

@@ -6,7 +6,6 @@
 	icon = 'icons/turf/floors.dmi'
 	base_icon_state = "floor"				//sandstorm change - tile floofing
 	baseturfs = /turf/open/floor/plating
-	dirt_buildup_allowed = TRUE
 
 	footstep = FOOTSTEP_FLOOR
 	barefootstep = FOOTSTEP_HARD_BAREFOOT
@@ -29,8 +28,7 @@
 
 	thermal_conductivity = 0.04
 	heat_capacity = 10000
-	intact = 1
-	tiled_dirt = TRUE							//included - tile floofing
+	turf_flags = TURF_FLAGS_FLOOR
 
 	var/broken = FALSE
 	var/burnt = FALSE
@@ -191,18 +189,18 @@
 		return TRUE
 	if(..())
 		return TRUE
-	if(intact && istype(C, /obj/item/stack/tile))
+	if((turf_flags & TURF_INTACT) && istype(C, /obj/item/stack/tile))
 		try_replace_tile(C, user, params)
 	return FALSE
 
 /turf/open/floor/crowbar_act(mob/living/user, obj/item/I)
-	return intact ? FORCE_BOOLEAN(pry_tile(I, user)) : FALSE
+	return ((turf_flags & TURF_INTACT) && user.a_intent == INTENT_HELP) ? FORCE_BOOLEAN(pry_tile(I, user)) : FALSE
 
 /turf/open/floor/proc/try_replace_tile(obj/item/stack/tile/T, mob/user, params)
 	if(T.turf_type == type)
 		return
 	var/obj/item/CB = user.is_holding_tool_quality(TOOL_CROWBAR)
-	if(!CB)
+	if(!CB || user.a_intent != INTENT_HELP)
 		return
 	var/turf/open/floor/plating/P = pry_tile(CB, user, TRUE)
 	if(!istype(P))
@@ -218,10 +216,10 @@
 		broken = 0
 		burnt = 0
 		if(user && !silent)
-			to_chat(user, "<span class='notice'>You remove the broken plating.</span>")
+			to_chat(user, span_notice("Вы убрали повреждённое покрытие."))
 	else
 		if(user && !silent)
-			to_chat(user, "<span class='notice'>You remove the floor tile.</span>")
+			to_chat(user, span_notice("Вы сняли покрытие пола."))
 		if(floor_tile && make_tile)
 			spawn_tile()
 	return make_plating()
@@ -284,14 +282,18 @@
 
 /turf/open/floor/rcd_act(mob/user, obj/item/construction/rcd/the_rcd, passed_mode)
 	switch(passed_mode)
+		// DM язык "по-китайски" считает приоритет операторов (|| идёт раньше чем in), нежели интуитивно понятно
+		// и это приводит к тому, что 2+ locate() читается как ублюдское "locate(A) in (src || (locate(B) in src))"
+		// Решилось оно вложением locate() проверки в скобки
 		if(RCD_FLOORWALL)
-			to_chat(user, "<span class='notice'>You build a wall.</span>")
+			to_chat(user, span_notice("Вы возвели стену."))
 			PlaceOnTop(/turf/closed/wall)
 			return TRUE
 		if(RCD_AIRLOCK)
-			if(locate(/obj/machinery/door/airlock) in src)
+			if((locate(/obj/machinery/door/airlock) in src))
+				to_chat(user, span_warning("Здесь нет места для возведения шлюза!"))
 				return FALSE
-			to_chat(user, "<span class='notice'>You build an airlock.</span>")
+			to_chat(user, span_notice("Вы построили шлюз."))
 			var/obj/machinery/door/airlock/A = new the_rcd.airlock_type(src)
 
 			A.electronics = new/obj/item/electronics/airlock(A)
@@ -309,26 +311,36 @@
 		if(RCD_DECONSTRUCT)
 			if(!ScrapeAway(flags = CHANGETURF_INHERIT_AIR))
 				return FALSE
-			to_chat(user, "<span class='notice'>You deconstruct [src].</span>")
+			to_chat(user, span_notice("Вы разобрали [src]."))
 			return TRUE
 		if(RCD_WINDOWGRILLE)
-			if(locate(/obj/structure/grille) in src)
+			if((locate(/obj/structure/grille) in src))
 				return FALSE
-			to_chat(user, "<span class='notice'>You construct the grille.</span>")
+			to_chat(user, span_notice("Вы возвели решётку."))
 			var/obj/structure/grille/G = new(src)
 			G.anchored = TRUE
 			return TRUE
 		if(RCD_MACHINE)
-			if(locate(/obj/structure/frame/machine) in src)
+			if((locate(/obj/structure/frame/machine) in src) || (locate(/obj/structure/frame/computer) in src))
+				to_chat(user, span_warning("Здесь нет места для возведения машинного каркаса!"))
 				return FALSE
+			for(var/obj/machinery/M in src)
+				if(M.density == 1)
+					to_chat(user, span_warning("Здесь нет места для возведения машинного каркаса!"))
+					return FALSE
 			var/obj/structure/frame/machine/M = new(src)
 			M.state = 2
 			M.icon_state = "box_1"
 			M.anchored = TRUE
 			return TRUE
 		if(RCD_COMPUTER)
-			if(locate(/obj/structure/frame/computer) in src)
+			if((locate(/obj/structure/frame/computer) in src) || (locate(/obj/structure/frame/machine) in src))
+				to_chat(user, span_warning("Здесь нет места для возведения компьютерного каркаса!"))
 				return FALSE
+			for(var/obj/machinery/M in src)
+				if(M.density == 1)
+					to_chat(user, span_warning("Здесь нет места для возведения компьютерного каркаса!"))
+					return FALSE
 			var/obj/structure/frame/computer/C = new(src)
 			C.anchored = TRUE
 			C.state = 1
@@ -361,7 +373,7 @@
  * Flags argument is passed directly to ChangeTurf or PlaceOnTop
  */
 /turf/open/proc/replace_floor(turf/open/new_floor_path, flags)
-	if (!overfloor_placed && initial(new_floor_path.overfloor_placed))
+	if (!(turf_flags & TURF_OVERFLOOR_PLACED) && (initial(new_floor_path.turf_flags) & TURF_OVERFLOOR_PLACED))
 		PlaceOnTop(new_floor_path, flags = flags)
 		return
 	ChangeTurf(new_floor_path, flags = flags)

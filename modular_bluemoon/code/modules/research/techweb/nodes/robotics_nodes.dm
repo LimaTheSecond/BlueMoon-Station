@@ -19,6 +19,11 @@
 
 // Модули для киборгов
 
+// Модуль Доминатрикс доступен в фабрикаторе с самого начала
+/datum/techweb_node/cyborg/New()
+	. = ..()
+	design_ids += "borg_dominatrix"
+
 /datum/techweb_node/cyborg_upg_advmedtools
 	id = "cyborg_upg_advmedtools"
 	display_name = "Cyborg Upgrades: Advanced Surgery Tools"
@@ -26,7 +31,16 @@
 	informing_radio_channels = list(RADIO_CHANNEL_SCIENCE)
 	prereq_ids = list("advance_surgerytools", "cyborg_upg_med")
 	design_ids = list("borg_upgrade_advmedtools")
-	research_costs = list(TECHWEB_POINT_TYPE_GENERIC = 4000)
+	research_costs = list(TECHWEB_POINT_TYPE_GENERIC = 3000)
+
+/datum/techweb_node/cyborg_upg_alien_combi_med_tools
+	id = "cyborg_upg_alien_combi_med_tools"
+	display_name = "Cyborg Upgrades: Alien Combi Surgery Tools"
+	description = "We can advance alien techonology while re-managing modules for fastest space saving."
+	informing_radio_channels = list(RADIO_CHANNEL_SCIENCE)
+	prereq_ids = list("cyborg_upg_advmedtools", "alien_combi_tools")
+	design_ids = list("borg_upgrade_alien_combi_med_tools")
+	research_costs = list(TECHWEB_POINT_TYPE_GENERIC = 3000)
 
 /datum/techweb_node/cyborg_upg_syndircd
 	id = "cyborg_upg_syndircd"

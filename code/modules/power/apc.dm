@@ -309,11 +309,14 @@
 				log_mapping("APC: ([src]) at [AREACOORD(src)] with dir ([tdir] | [uppertext(dir2text(tdir))]) has pixel_y value ([pixel_y] - should be -23.)")
 			pixel_y = -23
 		if(EAST)
-			if((pixel_y != initial(pixel_x)) && (pixel_x != 24))
+			// pixel_x, а не pixel_y: копипаста сравнивала вертикальное смещение с дефолтом
+			// горизонтального, поэтому у повёрнутых на восток и запад APC сбитый pixel_x
+			// проверялся мимо - лог показывал ложные срабатывания и пропускал настоящие.
+			if((pixel_x != initial(pixel_x)) && (pixel_x != 24))
 				log_mapping("APC: ([src]) at [AREACOORD(src)] with dir ([tdir] | [uppertext(dir2text(tdir))]) has pixel_x value ([pixel_x] - should be 24.)")
 			pixel_x = 24
 		if(WEST)
-			if((pixel_y != initial(pixel_x)) && (pixel_x != -25))
+			if((pixel_x != initial(pixel_x)) && (pixel_x != -25))
 				log_mapping("APC: ([src]) at [AREACOORD(src)] with dir ([tdir] | [uppertext(dir2text(tdir))]) has pixel_x value ([pixel_x] - should be -25.)")
 			pixel_x = -25
 	if (building)
@@ -705,7 +708,7 @@
 		var/turf/host_turf = get_turf(src)
 		if(!host_turf)
 			CRASH("attackby on APC when it's not on a turf")
-		if (host_turf.intact)
+		if (host_turf.turf_flags & TURF_INTACT)
 			to_chat(user, "<span class='warning'>You must remove the floor plating in front of the APC first!</span>")
 			return
 		else if (terminal)
@@ -1782,10 +1785,25 @@
 	else
 		return FALSE
 
+/// Есть ли в зоне машина с critical_machine: такие зоны не обесточиваются сбоями питания.
+/proc/area_has_critical_machine(area/checked_area)
+	var/static/list/critical_types
+	if(!critical_types)
+		critical_types = list()
+		for(var/obj/machinery/machine_type as anything in subtypesof(/obj/machinery))
+			if(initial(machine_type.critical_machine))
+				critical_types += machine_type
+		// Пульт ускорителя частиц становится критичным только после сборки, в part_scan().
+		critical_types |= typesof(/obj/machinery/particle_accelerator/control_box)
+	for(var/obj/machinery/machine_type as anything in critical_types)
+		for(var/obj/machinery/machine as anything in SSmachines.get_machines_by_type(machine_type))
+			if(machine.critical_machine && get_area(machine) == checked_area)
+				return TRUE
+	return FALSE
+
 /obj/machinery/power/apc/proc/energy_fail(duration)
-	for(var/obj/machinery/M in area.contents)
-		if(M.critical_machine)
-			return
+	if(area_has_critical_machine(area))
+		return
 	for(var/A in GLOB.ai_list)
 		var/mob/living/silicon/ai/I = A
 		if(get_base_area(I) == area)

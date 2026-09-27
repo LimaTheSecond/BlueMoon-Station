@@ -17,6 +17,15 @@
 #define TOX_SYSCORRUPT 2 //For toxins damage causing adverse effects to robotic organisms, up to and including fatal corruption, or healing that damage
 #define TOX_OMNI 3 //For tox damage / healing that affects both organics and robotic organisms. Used by very few things, e.g. aheals / by default setToxLoss()
 
+//Тяжесть сбоя системной повреждённости: контракт между handle_corruption() и error_handler().
+//Здесь, а не в handle_corruption.dm: ту же шкалу зовёт ионный шторм.
+
+#define CORRUPTION_ERROR_NONE 0
+#define CORRUPTION_ERROR_MINOR 1
+#define CORRUPTION_ERROR_MAJOR 2
+#define CORRUPTION_ERROR_CRITICAL 3
+#define CORRUPTION_ERROR_CATASTROPHIC 4
+
 //bitflag damage defines used for suicide_act
 #define BRUTELOSS 		(1<<0)
 #define FIRELOSS 		(1<<1)
@@ -130,6 +139,7 @@
 #define ATTACK_EFFECT_KICK		"kick"
 #define ATTACK_EFFECT_SMASH		"smash"
 #define ATTACK_EFFECT_CLAW		"claw"
+#define ATTACK_EFFECT_SLASH		"slash"
 #define ATTACK_EFFECT_DISARM	"disarm"
 #define ATTACK_EFFECT_ASS_SLAP  "ass_slap"
 #define ATTACK_EFFECT_FACE_SLAP "face_slap"
@@ -137,6 +147,14 @@
 #define ATTACK_EFFECT_MECHFIRE	"mech_fire"
 #define ATTACK_EFFECT_MECHTOXIN	"mech_toxin"
 #define ATTACK_EFFECT_BOOP		"boop" //Honk
+#define ATTACK_EFFECT_VOID		"void"
+
+/// Анимация взмаха для режущего оружия
+#define ATTACK_ANIMATION_SLASH	"slash"
+/// Анимация выпада для колющего оружия
+#define ATTACK_ANIMATION_PIERCE	"pierce"
+/// Анимация удара для дробящего оружия
+#define ATTACK_ANIMATION_BLUNT	"blunt"
 
 //intent defines
 #define INTENT_HELP   "help"

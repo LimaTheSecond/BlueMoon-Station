@@ -86,6 +86,10 @@
 	if (CONFIG_GET(flag/log_virus))
 		WRITE_LOG(GLOB.world_virus_log, "VIRUS: [text]")
 
+/proc/log_hfr(text)
+	if (CONFIG_GET(flag/log_hfr))
+		WRITE_LOG(GLOB.world_hfr_log, "HFR: [text]")
+
 /proc/log_asset(text)
 	WRITE_LOG(GLOB.world_asset_log, "ASSET: [text]")
 
@@ -242,7 +246,8 @@
 	WRITE_LOG_NO_FORMAT(GLOB.ping_perf_log, .)
 
 /proc/log_reagent(text)
-	WRITE_LOG(GLOB.reagent_log, text)
+	if (CONFIG_GET(flag/log_reagents))
+		WRITE_LOG(GLOB.reagent_log, text)
 
 /proc/log_reagent_transfer(text)
 	log_reagent("TRANSFER: [text]")

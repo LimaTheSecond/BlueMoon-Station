@@ -4,6 +4,7 @@ import { PrefRow } from '../components/PrefRow';
 
 type SoundsData = {
   sound_lobby: boolean;
+  sound_actions_button: boolean;
   sound_midi: boolean;
   sound_instruments: boolean;
   sound_jukeboxes: boolean;
@@ -13,6 +14,7 @@ type SoundsData = {
   sound_announcements: boolean;
   sound_bark: boolean;
   sound_emote: boolean;
+  sound_breathing: boolean;
   sound_volume_midi: number;
   sound_volume_ambience: number;
   sound_volume_ship_ambience: number;
@@ -60,6 +62,18 @@ export const SoundsSection = (props) => {
         checked={data.sound_lobby}
         tooltip="Воспроизводить музыку на экране ожидания (лобби) при подключении к серверу"
         onClick={() => act('toggle_sound', { flag: 'sound_lobby' })}
+      />
+      <PrefRow
+        label="Звук кнопок способностей"
+        checked={data.sound_actions_button}
+        tooltip="Воспроизводить звук при нажатии на кнопки способностей"
+        onClick={() => act('toggle_sound', { flag: 'sound_actions_button' })}
+      />
+      <PrefRow
+        label="Дыхание из баллона"
+        checked={data.sound_breathing}
+        tooltip="Звук дыхания при дыхании из внутреннего баллона (интерналс)"
+        onClick={() => act('toggle_sound', { flag: 'sound_breathing' })}
       />
       {SOUND_WITH_VOL.map(({ key, label, volKey, tooltip }) => {
         const enabled = data[key];

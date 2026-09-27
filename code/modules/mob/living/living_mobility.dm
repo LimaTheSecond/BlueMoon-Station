@@ -59,9 +59,20 @@
 	set_resting(FALSE, TRUE)
 	return TRUE
 
+//Машиночитаемое положение тела (в отличие от пиксельного lying). Вызывается
+//только из update_mobility(): ранний выход при неизменном значении обязателен -
+//иначе это налог на каждого карбона каждый тик Life.
+/mob/living/proc/set_body_position(new_position)
+	if(body_position == new_position)
+		return
+	body_position = new_position
+	SEND_SIGNAL(src, COMSIG_LIVING_SET_BODY_POSITION)
+
 //Updates canmove, lying and icons. Could perhaps do with a rename but I can't think of anything to describe it.
 //Robots, animals and brains have their own version so don't worry about them
 /mob/living/proc/update_mobility()
+	if(HAS_TRAIT_FROM(src, TRAIT_MUTE, TIMESTOP_TRAIT)) //нельзя падать, будучи замороженным
+		return
 	var/stat_softcrit = stat == SOFT_CRIT
 	var/stat_conscious = (stat == CONSCIOUS) || stat_softcrit
 
@@ -103,6 +114,7 @@
 			should_be_lying = buckled.buckle_lying
 
 	if(should_be_lying)
+		set_body_position(LYING_DOWN)
 		mobility_flags &= ~MOBILITY_STAND
 		setMovetype(movement_type | CRAWLING)
 		if(!lying) //force them on the ground
@@ -121,9 +133,15 @@
 			if(has_gravity() && !buckled)
 				playsound(src, "bodyfall", 20, 1)
 	else
+		set_body_position(STANDING_UP)
 		setMovetype(movement_type & ~CRAWLING)
 		mobility_flags |= MOBILITY_STAND
 		lying = 0
+
+	var/new_body_position = should_be_lying ? LYING_DOWN : STANDING_UP
+	if(body_position != new_body_position)
+		body_position = new_body_position
+		SEND_SIGNAL(src, COMSIG_LIVING_SET_BODY_POSITION)
 
 	if(restrained || incapacitated())
 		mobility_flags &= ~MOBILITY_UI

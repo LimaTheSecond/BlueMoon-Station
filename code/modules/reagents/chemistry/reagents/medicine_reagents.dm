@@ -301,7 +301,12 @@
 		new /obj/item/stack/medical/mesh/five(get_turf(G), reac_volume)
 		G.use(reac_volume)
 
-/datum/reagent/medicine/silver_sulfadiazine/reaction_mob(mob/living/M, method=TOUCH, reac_volume, show_message = 1, affected_bodypart = BODY_ZONE_CHEST)
+// Сигнатура обязана совпадать с /datum/reagent/proc/reaction_mob: пропущенный
+// touch_protection сдвигал аргументы, а дефолтом стояла ЗОНА строкой
+// (BODY_ZONE_CHEST) там, где весь код ниже ждёт /obj/item/bodypart. Плеснуть
+// сульфадиазином из стакана - и два рантайма подряд: "Cannot read "chest".body_zone"
+// и "Cannot read "chest".burn_dam" (раунд 9827).
+/datum/reagent/medicine/silver_sulfadiazine/reaction_mob(mob/living/M, method=TOUCH, reac_volume, show_message = 1, touch_protection = 0, affected_bodypart)
 	if(M.stat == DEAD)
 		return ..()
 
@@ -316,6 +321,9 @@
 	var/reac_strength = reac_volume
 	var/mob/living/carbon/human/H = M
 	var/obj/item/bodypart/aff_bodypart = affected_bodypart
+	//зону подают не всегда: плеснули из стакана - прилетает по груди
+	if(ishuman(M) && !istype(aff_bodypart))
+		aff_bodypart = H.get_bodypart(BODY_ZONE_CHEST)
 	// Проверка на одежду
 	if(ishuman(M))
 		if(method == TOUCH && aff_bodypart)
@@ -325,7 +333,7 @@
 				if(protecting_clothing.clothing_flags & THICKMATERIAL) // РИГ? ЕВА? Бронежилет СБ? Не подействует.
 					M.visible_message(span_danger("[H] был[H.ru_a()] чем-то облит[H.ru_a()], но оно стекло вниз по [protecting_clothing.name]!"), \
 								span_danger("Меня чем-то облили, но оно стекло вниз по [protecting_clothing.name]!"))
-					playsound(src.loc, 'modular_bluemoon/krashly/sound/items/watersplash.ogg', 40, 1)
+					playsound(src.loc, 'sound/effects/watersplash.ogg', 40, 1)
 					return ..()
 				else
 					reac_strength = reac_strength * 0.6 // Защита любой одеждой снижает эффективность препарата
@@ -439,6 +447,9 @@
 	var/reac_strength = reac_volume
 	var/mob/living/carbon/human/H = M
 	var/obj/item/bodypart/aff_bodypart = affected_bodypart
+	//зону подают не всегда: плеснули из стакана - прилетает по груди
+	if(ishuman(M) && !istype(aff_bodypart))
+		aff_bodypart = H.get_bodypart(BODY_ZONE_CHEST)
 	// Проверка на одежду
 	if(ishuman(M))
 		if(method == TOUCH && aff_bodypart)
@@ -448,7 +459,7 @@
 				if(protecting_clothing.clothing_flags & THICKMATERIAL) // РИГ? ЕВА? Бронежилет СБ? Не подействует.
 					M.visible_message(span_danger("[H] был[H.ru_a()] чем-то облит[H.ru_a()], но оно стекло вниз по [protecting_clothing.name]!"), \
 								span_danger("Меня чем-то облили, но оно стекло вниз по [protecting_clothing.name]!"))
-					playsound(src.loc, 'modular_bluemoon/krashly/sound/items/watersplash.ogg', 40, 1)
+					playsound(src.loc, 'sound/effects/watersplash.ogg', 40, 1)
 					return ..()
 				else
 					reac_strength = reac_strength * 0.6 // Защита любой одеждой снижает эффективность препарата
@@ -636,9 +647,13 @@
 		if(M.stat == DEAD)
 			show_message = 0
 		if(method in list(INGEST, VAPOR))
-			C.losebreath++
-			C.emote("cough")
-			to_chat(M, "<span class='danger'>You feel your throat closing up!</span>")
+			// Отбойник по stat строкой выше глушит только ветку PATCH/TOUCH - до этой
+			// он не доходит. Труп не давится и не кашляет, а losebreath на мёртвом теле
+			// просто копится и портит шансы на дефибрилляцию.
+			if(M.stat != DEAD)
+				C.losebreath++
+				C.emote("cough")
+				to_chat(M, "<span class='danger'>You feel your throat closing up!</span>")
 		else if(method == INJECT)
 			return
 		else if(method in list(PATCH, TOUCH))
@@ -852,7 +867,6 @@
 	M.adjustOxyLoss(-3*REM, 0)
 	if(M.losebreath >= 4)
 		M.losebreath -= 2
-	M.Jitter(5)
 	..()
 	. = 1
 

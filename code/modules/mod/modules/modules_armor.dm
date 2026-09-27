@@ -1,0 +1,164 @@
+/obj/item/mod/module/armor
+	name = "Base MOD armor"
+	icon_state = "base_armor"
+	desc = "Незавершенная плитка дополнительной брони, защищающая владельца от указанного на этикетке типа повреждений. Стоит понимать, что \
+	каждая такая плитка имеет вес и, следовательно, повышает энергопотребление из-за нагрузки на сервоприводы."
+	module_type = MODULE_ARMOR
+	var/datum/armor/additional_armor = new()
+	var/armor_module_type //MELEE, BULLET, LASER
+	var/armor_bonus = 15
+	var/need_sheets = 10
+	var/slowdown_bonus = 0.25
+	var/list/material_to_armor_list
+	incompatible_modules = list(/obj/item/mod/module/anomaly_locked/antigrav)
+	complexity = 2
+
+/obj/item/mod/module/armor/Initialize(mapload)
+	. = ..()
+	material_to_armor_list = list(
+		/obj/item/stack/sheet/durathread::name 			 = MELEE,
+		/obj/item/stack/sheet/plasteel::name 			 = BULLET,
+		/obj/item/stack/sheet/mineral/titanium::name 	 = LASER,
+		/obj/item/stack/sheet/mineral/diamond::name		 = ENERGY,
+		/obj/item/stack/sheet/mineral/gold::name		 = BOMB,
+		/obj/item/stack/sheet/mineral/silver::name		 = BIO,
+		/obj/item/stack/sheet/mineral/plastitanium::name = RAD,
+		/obj/item/stack/sheet/plastitaniumglass::name	 = FIRE,
+		/obj/item/stack/sheet/rglass::name				 = ACID,
+		/obj/item/stack/sheet/mineral/adamantine::name	 = MAGIC,
+		/obj/item/stack/sheet/mineral/abductor::name	 = WOUND,
+	)
+
+/obj/item/mod/module/armor/Destroy()
+	. = ..()
+	for(var/obj/item/stack/sheet/element in material_to_armor_list)
+		qdel(element)
+
+/obj/item/mod/module/armor/examine_more(mob/user)
+	. = ..()
+	if(armor_module_type)
+		return
+	. += span_boldnotice("Сейчас доступны варианты:")
+	for(var/material in material_to_armor_list)
+		. += (span_alert("Материал --[(material)]-- позволяет сделать защиту от:") + span_revenminor("[material_to_armor_list[material]]"))
+
+/obj/item/mod/module/armor/proc/add_armor_bonus()
+	if(!mod.theme.compatible_with_armor_modules)
+		on_uninstall()
+		return
+	for(var/index in mod.mod_parts)
+		if(index == MOD_PART_CELL)
+			continue
+		var/obj/item/clothing/mod_part/part = mod.mod_parts[index]
+		var/datum/armor/part_armor = part.get_armor()
+		part.set_armor(part_armor.generate_new_with_modifiers(list("[armor_module_type]" = armor_bonus)))
+	mod.slowdown_active += slowdown_bonus
+	mod.slowdown_inactive += slowdown_bonus
+
+/obj/item/mod/module/armor/proc/remove_armor_bonus()
+	for(var/index in mod.mod_parts)
+		if(index == MOD_PART_CELL)
+			continue
+		var/obj/item/clothing/mod_part/part = mod.mod_parts[index]
+		var/datum/armor/part_armor = part.get_armor()
+		part.set_armor(part_armor.generate_new_with_modifiers(list("[armor_module_type]" = -armor_bonus)))
+	mod.slowdown_active -= slowdown_bonus
+	mod.slowdown_inactive -= slowdown_bonus
+
+/obj/item/mod/module/armor/proc/get_armor_by_material(obj/item/stack/sheet/material)
+	for(var/material_name in material_to_armor_list)
+		if(material_name == material.name)
+			return material_to_armor_list[material_name]
+
+/obj/item/mod/module/armor/on_install()
+	. = ..()
+	if(!armor_module_type)
+		return
+	mod.current_armor_module_installed += 1
+	add_armor_bonus()
+
+/obj/item/mod/module/armor/on_uninstall()
+	. = ..()
+	if(!armor_module_type)
+		return
+	mod.current_armor_module_installed -= 1
+	remove_armor_bonus()
+
+
+/obj/item/mod/module/armor/attackby(obj/item/I, mob/living/user, params)
+//Чекает в списке какую броню ставить, если это материал и меняет icon_state с названием
+	. = ..()
+	if(armor_module_type)
+		return
+	var/mob/living/carbon/C = user
+	if(!istype(I, /obj/item/stack/sheet))
+		return
+	var/obj/item/stack/sheet/material = I
+	armor_module_type = get_armor_by_material(material)
+	if(material.amount < need_sheets || !armor_module_type)
+		var/ballon_message = armor_module_type ? "Нужно [need_sheets] листов" : "Не подходящий материал!"
+		C.balloon_alert(C, ballon_message)
+		armor_module_type = null
+		return
+	if(do_after(user, 2 SECONDS, src))
+		name = "[armor_module_type] MOD armor"
+		icon_state = "armor-[armor_module_type]"
+		desc = "Завершенный модуль брони для МОДа, который защищает от повреждений типа [armor_module_type]"
+		material.use(need_sheets)
+	else
+		armor_module_type = null
+
+/obj/item/mod/module/armor/prebuild
+	name = "Base prebuild"
+	complexity = 0
+	removable = TRUE
+
+/obj/item/mod/module/armor/prebuild/on_uninstall(deleting = FALSE, user)
+	. = ..()
+	var/mob/target_mob = user
+	if(mod.wearer)
+		target_mob = mod.wearer
+	if(deleting)
+		return
+	playsound(mod, "sparks", 40, TRUE, SHORT_RANGE_SOUND_EXTRARANGE)
+	if(target_mob)
+		balloon_alert(target_mob, span_big_warning("модуль раскалывается и разрушается!"))
+	qdel(src)
+
+/obj/item/mod/module/armor/prebuild/Initialize(mapload)
+	. = ..()
+	name = "[armor_module_type] Pre-Installed MOD armor"
+	icon_state = "armor-[armor_module_type]"
+
+/obj/item/mod/module/armor/prebuild/melee
+	armor_module_type = MELEE
+
+/obj/item/mod/module/armor/prebuild/bullet
+	armor_module_type = BULLET
+
+/obj/item/mod/module/armor/prebuild/laser
+	armor_module_type = LASER
+
+/obj/item/mod/module/armor/prebuild/energy
+	armor_module_type = ENERGY
+
+/obj/item/mod/module/armor/prebuild/bomb
+	armor_module_type = BOMB
+
+/obj/item/mod/module/armor/prebuild/bio
+	armor_module_type = BIO
+
+/obj/item/mod/module/armor/prebuild/rad
+	armor_module_type = RAD
+
+/obj/item/mod/module/armor/prebuild/fire
+	armor_module_type = FIRE
+
+/obj/item/mod/module/armor/prebuild/acid
+	armor_module_type = ACID
+
+/obj/item/mod/module/armor/prebuild/magic
+	armor_module_type = MAGIC
+
+/obj/item/mod/module/armor/prebuild/wound
+	armor_module_type = WOUND

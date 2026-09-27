@@ -243,13 +243,29 @@
 /datum/controller/subsystem/proc/subsystem_log(msg)
 	return log_subsystem(name, msg)
 
+/**
+ * Чем подсистема занята прямо сейчас, одной строкой: для чёрного ящика МК и сообщений Failsafe.
+ *
+ * Зовётся из петли МК каждый проход и из Failsafe в момент, когда мир уже подвисает, поэтому
+ * обязана быть дешёвой и не спать: только чтение уже посчитанных величин, никаких переборов
+ * списков, обращений к диску и вызовов, способных упасть. Перевод строки внутри ответа сломает
+ * разбор сводки, см. code/controllers/mc_state.dm.
+ *
+ * Пустая строка - нормальный ответ, он значит "состояния, которое стоило бы записать, у меня нет";
+ * так отвечает большинство подсистем. Переопределять стоит там, где подвисание правдоподобно и
+ * состояние уже лежит в переменной: фаза прохода, длина недоеденной очереди, имя грузимого шаблона.
+ */
+/datum/controller/subsystem/proc/last_task()
+	SHOULD_NOT_SLEEP(TRUE)
+	return ""
+
 //used to initialize the subsystem AFTER the map has loaded
 /datum/controller/subsystem/Initialize(start_timeofday)
 	initialized = TRUE
 	SEND_SIGNAL(src, COMSIG_SUBSYSTEM_POST_INITIALIZE, start_timeofday)
 	var/time = (REALTIMEOFDAY - start_timeofday) / 10
 	var/msg = "Initialized [name] subsystem within [time] second[time == 1 ? "" : "s"]!"
-	to_chat(world, span_boldannounce("[msg]"))
+	to_chat(GLOB.admins, span_boldannounce("[msg]"))
 	log_subsystem(msg)
 	return time
 

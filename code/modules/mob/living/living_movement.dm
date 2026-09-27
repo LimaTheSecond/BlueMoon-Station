@@ -74,32 +74,41 @@
 
 /mob/living/proc/update_pull_movespeed()
 	// BLUEMOON ADD START
-	var/modified = FALSE
 	if(pulling && isliving(pulling))
 		var/mob/living/L = pulling
 
-		if(L.mob_weight > MOB_WEIGHT_HEAVY && src.mob_weight < MOB_WEIGHT_HEAVY_SUPER) // Сверхтяжёлых персонажей очень сложно тянуть
-			if(src.mob_weight < MOB_WEIGHT_HEAVY)
-				add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag, multiplicative_slowdown = PULL_HEAVY_SUPER_SLOWDOWN)
+		// Замедление работает только если в цепи 3+ игроков (тянем того, кто сам кого-то тащит)
+		if(L.pulling && isliving(L.pulling))
+			add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/pull_slowdown, multiplicative_slowdown = PULL_SLOWDOWN)
+
+			if(drag_slowdown && L.lying && !L.buckled && grab_state < GRAB_AGGRESSIVE)
+				add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/bulky_drag, multiplicative_slowdown = PULL_PRONE_SLOWDOWN)
 			else
+				remove_movespeed_modifier(/datum/movespeed_modifier/bulky_drag)
+
+			if(L.mob_weight > MOB_WEIGHT_HEAVY && src.mob_weight < MOB_WEIGHT_HEAVY_SUPER)
+				if(src.mob_weight < MOB_WEIGHT_HEAVY)
+					add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag, multiplicative_slowdown = PULL_HEAVY_SUPER_SLOWDOWN)
+				else
+					add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag, multiplicative_slowdown = PULL_HEAVY_SLOWDOWN)
+			else if(L.mob_weight > MOB_WEIGHT_NORMAL && src.mob_weight < MOB_WEIGHT_HEAVY)
 				add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag, multiplicative_slowdown = PULL_HEAVY_SLOWDOWN)
-			modified = TRUE
+			else
+				remove_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag)
 
-		if(L.mob_weight > MOB_WEIGHT_NORMAL && src.mob_weight < MOB_WEIGHT_HEAVY) // Тяжёлых персонажей сложнее тянуть, но не для тяжёлых или свертяжёлых
-			add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag, multiplicative_slowdown = PULL_HEAVY_SLOWDOWN)
-			modified = TRUE
-
-		if(drag_slowdown && L.lying && !L.buckled && grab_state < GRAB_AGGRESSIVE)
-			add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/bulky_drag, multiplicative_slowdown = PULL_PRONE_SLOWDOWN)
 			return
 
-		// PULL_SLOWDOWN
-		else if(drag_slowdown && !modified)
-			add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/pull_slowdown, multiplicative_slowdown = PULL_SLOWDOWN)
-			modified = TRUE
+	// Таскание лежачего или мёртвого — замедление есть, даже без цепи
+	if(pulling && isliving(pulling))
+		var/mob/living/L = pulling
+		if(L.stat == DEAD || L.lying)
+			if(drag_slowdown && L.lying && !L.buckled && grab_state < GRAB_AGGRESSIVE)
+				add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/bulky_drag, multiplicative_slowdown = PULL_PRONE_SLOWDOWN)
+			else if(L.stat == DEAD)
+				add_or_update_variable_movespeed_modifier(/datum/movespeed_modifier/pull_slowdown, multiplicative_slowdown = PULL_SLOWDOWN)
+			return
 
-	if(modified)
-		return
+	// Вне цепи 3+ и не лежачий/мёртвый — убираем все замедления от пета
 	remove_movespeed_modifier(/datum/movespeed_modifier/pull_slowdown)
 	remove_movespeed_modifier(/datum/movespeed_modifier/bulky_drag)
 	remove_movespeed_modifier(/datum/movespeed_modifier/heavy_mob_drag)
@@ -174,11 +183,15 @@
 				if(first_client_on_z && GLOB.ai_controllers_by_zlevel.len >= new_z)
 					for(var/datum/ai_controller/controller as anything in GLOB.ai_controllers_by_zlevel[new_z])
 						controller.set_ai_status(controller.get_expected_ai_status())
+				// Счётчик простоя обнуляется ВСЕГДА, а не только при подъёме: посещение уже
+				// поднятого уровня иначе не оставляет следа между сканами сноса. См.
+				// SSlighting.note_zlevel_visit().
+				SSlighting.note_zlevel_visit(new_z)
 				// Initialize deferred lighting when first client enters a z-level
 				// Skip during bulk operations (shuttle docking) — docking creates lighting for shuttle turfs,
 				// and remaining turfs will be initialized when the deferred batch completes
 				if(should_ondemand_init_zlevel(new_z))
-					INVOKE_ASYNC(GLOBAL_PROC, GLOBAL_PROC_REF(create_lighting_for_zlevel), new_z)
+					INVOKE_ASYNC(GLOBAL_PROC, GLOBAL_PROC_REF(create_lighting_for_zlevel), new_z, LIGHTING_INIT_REASON_LIVING)
 				for (var/I in length(SSidlenpcpool.idle_mobs_by_zlevel[new_z]) to 1 step -1) //Backwards loop because we're removing (guarantees optimal rather than worst-case performance), it's fine to use .len here but doesn't compile on 511
 					var/mob/living/simple_animal/SA = SSidlenpcpool.idle_mobs_by_zlevel[new_z][I]
 					if (SA)

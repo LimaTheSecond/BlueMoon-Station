@@ -1,8 +1,8 @@
 /obj/machinery/poweredfans
 	icon = 'icons/obj/poweredfans.dmi'
 	icon_state = "mfan_powered"
-	name = "micro powered fan"
-	desc = "A handmade fan, releasing a thin gust of air."
+	name = "powered microfan"
+	desc = "Самодельный лопастной вентилятор, выпускающий тонкий поток воздуха."
 	use_power = ACTIVE_POWER_USE
 	power_channel = ENVIRON
 	idle_power_usage = 5
@@ -13,6 +13,15 @@
 	density = FALSE
 	CanAtmosPass = ATMOS_PASS_NO
 	var/obj/machinery/fan_assembly/assembly
+
+/obj/machinery/poweredfans/Destroy()
+	CanAtmosPass = ATMOS_PASS_YES
+	air_update_turf(TRUE)
+	// Сборка живёт внутри вентилятора (Initialize кладёт её в src), и родитель
+	// раздаёт содержимое сам. Ссылку снимаем до него: иначе удалённый
+	// вентилятор держит сборку за собой, и уходит в хардделы уже она.
+	assembly = null
+	return ..()
 
 /obj/machinery/poweredfans/deconstruct(disassembled = TRUE)
 	if(!(flags_1 & NODECONSTRUCT_1))
@@ -27,8 +36,8 @@
 	qdel(src)
 
 /obj/machinery/poweredfans/wirecutter_act(mob/living/user, obj/item/I)
-	user.visible_message("<span class='warning'>[user] removes the wires from the [src].</span>",
-		"<span class='notice'>You start to remove the wires from the [src]...</span>", "You hear clanking and banging noises.")
+	user.visible_message(span_warning("[user] обрезает провода у [src]."),
+		span_notice("Вы начинаете обрезать проводку внутри корпуса [src]..."), "Вы слышите клацающие ножничные звуки.")
 	if(I.use_tool(src, user, 30, volume=50))
 		deconstruct()
 	return TRUE
@@ -40,17 +49,25 @@
 	else
 		assembly = new(src)
 		assembly.build_state = 3
-	air_update_turf(TRUE)
+	AddComponent(/datum/component/requires_floor)
+	refresh_atmos_barrier(TRUE)
+
+// Барьер поверфана держит и тепло - ровно пока держит воздух (то есть пока
+// есть питание). refresh_atmos_barrier() уже дёргает пересчёт соседства, так
+// что состояние кондукции меняется вместе с газовым.
+/obj/machinery/poweredfans/BlockThermalConductivity()
+	return CanAtmosPass == ATMOS_PASS_NO
 
 /obj/machinery/poweredfans/power_change()
 	..()
-	if(powered())
-		icon_state = "mfan_powered"
-		CanAtmosPass = ATMOS_PASS_NO
-		air_update_turf(TRUE)
-	else
-		icon_state = "mfan_unpowered"
-		CanAtmosPass = ATMOS_PASS_YES
-		air_update_turf(TRUE)
-	update_icon_state()
+	refresh_atmos_barrier()
+
+/obj/machinery/poweredfans/proc/refresh_atmos_barrier(force_update = FALSE)
+	var/blocking = powered()
+	var/new_pass = blocking ? ATMOS_PASS_NO : ATMOS_PASS_YES
+	icon_state = blocking ? "mfan_powered" : "mfan_unpowered"
+	if(!force_update && CanAtmosPass == new_pass)
+		return
+	CanAtmosPass = new_pass
+	air_update_turf(TRUE)
 

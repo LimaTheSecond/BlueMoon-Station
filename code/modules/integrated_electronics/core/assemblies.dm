@@ -41,11 +41,15 @@
 	var/datum/weakref/ie_gui_examined_circuit
 	var/ie_gui_examined_x = 0
 	var/ie_gui_examined_y = 0
-	/// TGUI: подсветка связи при передаче данных по проводу
-	var/ie_tgui_pulse_until = 0
-	var/ie_tgui_pulse_output_ref = null
-	var/ie_tgui_pulse_input_ref = null
-	var/datum/weakref/ie_tgui_pulse_chip_weak
+	/// TGUI: очередь «живых» импульсов для подсветки проводов/нод; храним все недавние, чтобы
+/// троттлинг не терял промежуточные активации (порядок = порядок активации).
+	/// entry: list("out"=REF, "in"=REF, "chip_in"=weakref, "chip_out"=weakref, "until"=world.time)
+	var/list/ie_tgui_pulses = list()
+	/// TGUI: троттлинг форс-обновлений окна при непрерывной работе схемы (иначе каждый push_data → полная ресериализация сотен компонентов).
+	var/ie_tgui_last_ui_push = 0
+	/// TGUI: пины, для которых открыт нативный редактор значений (список/текст) — REF(io) активен.
+	var/datum/integrated_io/ie_gui_editor_io
+	var/ie_gui_editor_is_output = FALSE
 	/// Last coarse diagnostic HUD state from compute_diagnostic_hud_process_key; skips redundant health/cell updates in process().
 	var/last_diag_process_key = ""
 	/// Cached "[icon]-[icon_state]-[dir]" so sync_diagnostic_hud_offsets avoids allocating /icon every diag call.
@@ -210,7 +214,10 @@
 	if(href_list["ghostscan"])
 		if((isobserver(usr) && ckeys_allowed_to_scan[usr.ckey]) || IsAdminGhost(usr))
 			if(assembly_components.len)
-				var/saved = "On circuit printers with cloning enabled, you may use the code below to clone the circuit:<br><br><code>[SScircuit.save_electronic_assembly(src)]</code>"
+				// html_encode обязателен, см. тот же случай в analyzer.dm: без него символы
+				// < > & из подписей компонентов браузер съедает как разметку, и скопированный
+				// JSON уже не разбирается принтером.
+				var/saved = "On circuit printers with cloning enabled, you may use the code below to clone the circuit:<br><br><code style='word-break:break-all;white-space:pre-wrap'>[html_encode(SScircuit.save_electronic_assembly(src))]</code>"
 				var/datum/browser/popup = new(usr, "circuit_scan", "Circuit Scan", 500, 600)
 				popup.set_content(saved)
 				popup.open()

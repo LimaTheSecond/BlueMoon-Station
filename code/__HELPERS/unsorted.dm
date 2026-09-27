@@ -265,11 +265,20 @@ Turf and target are separate in case you want to teleport some distance from a t
 	return .
 
 //Returns a list of all items of interest with their name
-/proc/getpois(mobs_only = FALSE, skip_mindless = FALSE, specify_dead_role = TRUE)
-	var/list/mobs = sortmobs()
+/// sorted = FALSE - для вызывающих, которые сортируют сами: sortmobs() по всему миру стоит ~20 мс.
+/proc/getpois(mobs_only = FALSE, skip_mindless = FALSE, specify_dead_role = TRUE, sorted = TRUE)
+	// тот же набор типов, что пропускает sortmobs()
+	var/static/list/poi_mob_typecache = typecacheof(list(
+		/mob/living/silicon/ai, /mob/camera, /mob/living/silicon/pai, /mob/living/silicon/robot,
+		/mob/living/carbon/human, /mob/living/brain, /mob/living/carbon/alien, /mob/dead/observer,
+		/mob/dead/new_player, /mob/living/carbon/monkey, /mob/living/simple_animal, /mob/living/carbon/true_devil
+	))
+	var/list/mobs = sorted ? sortmobs() : GLOB.mob_list
 	var/list/namecounts = list()
 	var/list/pois = list()
 	for(var/mob/M in mobs)
+		if(!sorted && !poi_mob_typecache[M.type])
+			continue
 		if(skip_mindless && (!M.mind && !M.ckey))
 			if(!isbot(M) && !iscameramob(M) && !ismegafauna(M))
 				continue
@@ -293,10 +302,18 @@ Turf and target are separate in case you want to teleport some distance from a t
 			pois[avoid_assoc_duplicate_keys(A.name, namecounts)] = A
 
 	return pois
-//Orders mobs by type then by name
-/proc/sortmobs()
+/**
+ * Orders mobs by type then by name.
+ *
+ * source - какой список раскладывать. По умолчанию все мобы мира, но вызывающему
+ * почти всегда нужно подмножество (например только мобы с ckey). Отфильтровать ДО
+ * вызова дешевле на порядок: sortNames() это Copy() плюс timsort с DM-компаратором,
+ * то есть O(n log n) вызовов прока по всему GLOB.mob_list, а дальше ещё полтора
+ * десятка полных проходов с istype. Фильтрация порядок не меняет.
+ */
+/proc/sortmobs(list/source = GLOB.mob_list)
 	var/list/moblist = list()
-	var/list/sortmob = sortNames(GLOB.mob_list)
+	var/list/sortmob = sortNames(source)
 	for(var/mob/living/silicon/ai/M in sortmob)
 		moblist.Add(M)
 	for(var/mob/camera/M in sortmob)
@@ -580,6 +597,10 @@ Turf and target are separate in case you want to teleport some distance from a t
 	return TRUE
 
 /proc/is_blocked_turf(turf/T, exclude_mobs)
+	// get_step() за краем карты возвращает null; для проходимости это стена
+	// (vomit в раунде 9875 ронял Life-цикл именно здесь).
+	if(!T)
+		return TRUE
 	if(T.density)
 		return TRUE
 	for(var/i in T)

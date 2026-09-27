@@ -36,11 +36,23 @@
 				break
 	return hits
 
-/proc/find_client_references(target, quiet = FALSE)
+/**
+ * Держатели target в клиентских структурах.
+ *
+ * quiet - не писать отчёт в лог рефтрекера, только вернуть список.
+ * yield - разрешить CHECK_TICK между клиентами. Из SSgarbage звать ТОЛЬКО с
+ * yield = FALSE: там проб работает внутри обхода очереди сборки, и сон посреди
+ * него оставил бы полуобработанную очередь. Автоматическая проба выполняется отложенно.
+ */
+/proc/find_client_references(target, quiet = FALSE, yield = TRUE)
 	var/list/results = list()
 	if(isnull(target))
 		return results
+	var/scan_images = isatom(target) || istype(target, /image)
 	for(var/client/game_client in GLOB.clients)
+		if(isnull(target))
+			results += "поиск прерван: цель уже удалена"
+			break
 		results += collect_client_ref_hits(target, game_client.ckey,
 			list(
 				"mob" = game_client.mob,
@@ -72,18 +84,20 @@
 				"screen_maps" = game_client.screen_maps,
 				"seen_messages" = game_client.seen_messages,
 			))
-		var/direct_hits = 0
-		var/attached_hits = 0
-		for(var/image/held_image in game_client.images)
-			if(held_image == target)
-				direct_hits++
-			else if(held_image.loc == target)
-				attached_hits++
-		if(direct_hits)
-			results += "client [game_client.ckey]: images x[direct_hits] (сам объект в images)"
-		if(attached_hits)
-			results += "client [game_client.ckey]: images x[attached_hits] с loc=цель (прикреплённые image держат объект)"
-		CHECK_TICK
+		if(scan_images)
+			var/direct_hits = 0
+			var/attached_hits = 0
+			for(var/image/held_image in game_client.images)
+				if(held_image == target)
+					direct_hits++
+				else if(held_image.loc == target)
+					attached_hits++
+			if(direct_hits)
+				results += "client [game_client.ckey]: images x[direct_hits] (сам объект в images)"
+			if(attached_hits)
+				results += "client [game_client.ckey]: images x[attached_hits] с loc=цель (прикреплённые image держат объект)"
+		if(yield)
+			CHECK_TICK
 	if(!quiet)
 		for(var/line in results)
 			log_reftracker("CLIENT PROBE: [line]")

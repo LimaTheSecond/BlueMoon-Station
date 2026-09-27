@@ -118,19 +118,19 @@
 	smooth = SMOOTH_MORE
 	canSmoothWith = list(/turf/closed/wall/mineral/titanium/survival, /obj/machinery/door/airlock/survival_pod, /obj/structure/window/shuttle/survival_pod, /turf/closed/indestructible/riveted)
 
-/obj/structure/window/shuttle/survival_pod/spawner/north
-	dir = NORTH
-
-/obj/structure/window/shuttle/survival_pod/spawner/east
-	dir = EAST
-
-/obj/structure/window/shuttle/survival_pod/spawner/west
-	dir = WEST
-
 /obj/structure/window/reinforced/survival_pod
 	name = "pod window"
 	icon = 'icons/obj/lavaland/survival_pod.dmi'
 	icon_state = "pwindow"
+
+/obj/structure/window/reinforced/survival_pod/north
+	dir = NORTH
+
+/obj/structure/window/reinforced/survival_pod/east
+	dir = EAST
+
+/obj/structure/window/reinforced/survival_pod/west
+	dir = WEST
 
 //Door
 /obj/machinery/door/airlock/survival_pod
@@ -277,6 +277,27 @@
 	var/buildstackamount = 5
 	CanAtmosPass = ATMOS_PASS_NO
 
+// Фан - это маппинговая печать проёма: он держит воздух там, где нужен проход
+// для людей (шлюзовые доки, двери руин, камера турбины). Тепло через него
+// ходило как через окно (0.1), поэтому запечатанная фанами камера всё равно
+// прогревала соседнее помещение до срабатывания пожарки - печать была только
+// на газ. Раз структура объявлена барьером, она барьер и по теплу.
+/obj/structure/fans/BlockThermalConductivity()
+	return CanAtmosPass == ATMOS_PASS_NO
+
+/obj/structure/fans/examine(mob/user)
+	. = ..()
+	. += "<span class='notice'>Держит и воздух, и тепло: проём за ним можно топить.</span>"
+
+/obj/structure/fans/Destroy()
+	// Соседство турфа кэшировано, и снятый фан обязан сам попросить пересчёт:
+	// иначе печать переживает структуру и проём остаётся закрытым - раньше по
+	// газу, теперь ещё и по теплу.
+	CanAtmosPass = ATMOS_PASS_YES
+	density = FALSE
+	air_update_turf(TRUE)
+	return ..()
+
 /obj/structure/fans/deconstruct()
 	if(!(flags_1 & NODECONSTRUCT_1))
 		if(buildstacktype)
@@ -295,11 +316,20 @@
 
 /obj/structure/fans/tiny
 	name = "tiny fan"
-	desc = "A tiny fan, releasing a thin gust of air."
+	desc = "Маленький вентилятор, выпускающий тонкий поток воздуха."
 	layer = ABOVE_NORMAL_TURF_LAYER
 	density = FALSE
 	icon_state = "fan_tiny"
 	buildstackamount = 10
+
+/obj/structure/fans/tiny/Initialize(mapload)
+	. = ..()
+	if(!isfloorturf(loc)) // Нет поверхности?
+		if(!mapload) // Мы не маппинг-объект?
+			return INITIALIZE_HINT_QDEL // Sisyphus Prime treatment
+		return
+	if(!(resistance_flags & INDESTRUCTIBLE) && !(invisibility == INVISIBILITY_ABSTRACT))
+		AddComponent(/datum/component/requires_floor)
 
 /obj/structure/fans/Initialize(mapload)
 	. = ..()
@@ -308,6 +338,7 @@
 //Inivisible, indestructible fans
 /obj/structure/fans/tiny/invisible
 	name = "air flow blocker"
+	flags_1 = NODECONSTRUCT_1
 	resistance_flags = INDESTRUCTIBLE | LAVA_PROOF | FIRE_PROOF | UNACIDABLE | ACID_PROOF
 	invisibility = INVISIBILITY_ABSTRACT
 

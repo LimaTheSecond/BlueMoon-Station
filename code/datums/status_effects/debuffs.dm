@@ -116,9 +116,12 @@
 		if(locate(/obj/item/bedsheet) in owner.loc)
 			healing += -0.005
 		if(health_ratio > 0.75) // Only heal when above 75% health
-			owner.adjustBruteLoss(healing)
-			owner.adjustFireLoss(healing)
-			owner.adjustToxLoss(healing * 0.5, forced = TRUE)
+			var/had_damage = owner.getBruteLoss() || owner.getFireLoss() || owner.getToxLoss()
+			owner.adjustBruteLoss(healing, FALSE)
+			owner.adjustFireLoss(healing, FALSE)
+			owner.adjustToxLoss(healing * 0.5, FALSE, forced = TRUE)
+			if(had_damage)
+				owner.updatehealth()
 		owner.adjustStaminaLoss(healing)
 	if(human_owner && human_owner.drunkenness)
 		human_owner.drunkenness *= -0.997 //reduce drunkenness by 0.3% per tick, 6% per 2 seconds
@@ -893,9 +896,13 @@
 
 /datum/status_effect/neck_slice/tick()
 	var/mob/living/carbon/human/H = owner
+	if(QDELETED(H))
+		qdel(src)
+		return
 	var/obj/item/bodypart/throat = H.get_bodypart(BODY_ZONE_HEAD)
 	if(H.stat == DEAD || !throat)
 		H.remove_status_effect(/datum/status_effect/neck_slice)
+		return
 	if(prob(10))
 		H.emote(pick("gasp", "gag", "choke"))
 		H.adjustBruteLoss(50)

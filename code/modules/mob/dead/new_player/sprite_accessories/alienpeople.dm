@@ -14,6 +14,10 @@
 	name = "Standard"
 	icon_state = "standard"
 
+/datum/sprite_accessory/xeno_dorsal/none
+	name = "None"
+	relevant_layers = null
+
 /datum/sprite_accessory/xeno_dorsal/down
 	name = "Dorsal Down"
 	icon_state = "down"
@@ -41,6 +45,91 @@
 	name = "Xenomorph Tail"
 	icon_state = "xeno"
 
+/datum/sprite_accessory/xeno_tail/boiler
+	name = "Xenomorph Boiler Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "boiler"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/predalien
+	name = "Xenomorph Predalien Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "predalien"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/pretor
+	name = "Xenomorph Pretor Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "pretor"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/prowler
+	name = "Xenomorph Prowler Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "prowler"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/queen
+	name = "Xenomorph Queen Tail"
+	icon_state = "queen"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/runner
+	name = "Xenomorph Runner Tail"
+	icon_state = "runner"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/long
+	icon = 'modular_citadel/icons/mob/xeno_big_tails_greyscale.dmi'
+	dimension_x = 64
+	dimension_y = 32
+	center = TRUE
+	color_src = MUTCOLORS
+	mutant_part_string = "tail"
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/long/lord
+	name = "Xenomorph Lord Tail"
+	icon_state = "lord"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/long/queenl
+	name = "Xenomorph Queen Long Tail"
+	icon_state = "queenl"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+/datum/sprite_accessory/xeno_tail/long/valkyr
+	name = "Xenomorph Valkyr tail"
+	icon_state = "valkyr"
+	color_src = MUTCOLORS
+	relevant_layers = list(BODY_BEHIND_LAYER, BODY_FRONT_LAYER)
+
+
+/datum/sprite_accessory/tails/mam_tails/xeno
+	name = "Xenomorph Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "xeno"
+	color_src = MUTCOLORS
+	matrixed_sections = MATRIX_NONE
+	recommended_species = list(SPECIES_MAMMAL, SPECIES_MAMMAL_SYNTHETIC, SPECIES_XENOHYBRID, SPECIES_SLIME_HYBRID, SPECIES_POD_WEAK, SPECIES_UMAMMAL)
+
+/datum/sprite_accessory/tails_animated/mam_tails_animated/xeno
+	name = "Xenomorph Tail"
+	icon = 'modular_citadel/icons/mob/xeno_parts_greyscale.dmi'
+	icon_state = "xeno"
+	mutant_part_string = "tail"
+	color_src = MUTCOLORS
+	matrixed_sections = MATRIX_NONE
+	recommended_species = list(SPECIES_MAMMAL, SPECIES_MAMMAL_SYNTHETIC, SPECIES_XENOHYBRID, SPECIES_SLIME_HYBRID, SPECIES_POD_WEAK, SPECIES_UMAMMAL)
+
 /******************************************
 ************* Xeno Heads ******************
 *******************************************/
@@ -59,6 +148,10 @@
 /datum/sprite_accessory/xeno_head/standard
 	name = "Standard"
 	icon_state = "standard"
+
+/datum/sprite_accessory/xeno_head/none
+	name = "None"
+	relevant_layers = null
 
 /datum/sprite_accessory/xeno_head/hollywood
 	name = "hollywood"

@@ -1,3 +1,7 @@
+/obj/item/clothing/neck/donator/bm
+	icon = 'modular_bluemoon/fluffs/icons/obj/clothing/neck.dmi'
+	mob_overlay_icon = 'modular_bluemoon/fluffs/icons/mob/clothing/neck.dmi'
+
 /obj/item/clothing/neck/SMART_fabric_boatcloak
 	name = "SMART-fabric boatcloak"
 	desc = "The tissue is capable of changing its structure by reading small nerve impulses from the body."
@@ -76,9 +80,73 @@
 
 /obj/item/clothing/neck/cloak/wintercape
 	name = "Winter Cape"
-	desc = "The cape is made of fairly thick fabric and trimmed with gold. The cape itself is designed in a wintery style, with icy accents and prominent gold shoulder straps, clearly identifying it as belonging to a Lieutenant Commander."
+	desc = "The cape is made of fairly thick fabric and trimmed with gold. The cape itself is designed in a wintery style, with icy accents and prominent gold shoulder straps."
 	icon_state = "wintercape"
 	item_state = "wintercape"
 	icon = 'modular_bluemoon/fluffs/icons/obj/clothing/neck.dmi'
 	mob_overlay_icon = 'modular_bluemoon/fluffs/icons/mob/clothing/neck.dmi'
 
+///////////////////////////////////////////////
+
+/obj/item/clothing/neck/donator/bm/antique_cape
+	name = "Antique cape"
+	desc = "An antique cape reminiscent of bygone times."
+	icon_state = "antique_cape"
+
+/obj/item/clothing/neck/donator/bm/antique_cape/ComponentInitialize()
+	. = ..()
+	AddElement(/datum/element/polychromic, list("#777777", "#FFFFCC", "#66FFFF"), 3)
+
+/obj/item/clothing/neck/donator/bm/concord_cloak
+	name = "Concord cloak kit"
+	desc = "Тряпки, тряпки и ещё раз тряпки. Ни функционала, ни цели, только стиль."
+	icon_state = "concord-cloak"
+	alternate_worn_layer = SUIT_STORE_LAYER // попросили сделать так, чтобы он отображался ПОД волосами и оружием одетым на спину, по идее ничего сломать не должно.
+	var/selected_type = "Cloak"
+
+/obj/item/clothing/neck/donator/bm/concord_cloak/equipped(mob/user, slot) //оверрайдим этот прок, дабы у нас вызывалась обнова иконки в момент одевания
+	. = ..()
+	update_icon()
+
+/obj/item/clothing/neck/donator/bm/concord_cloak/AltClick(mob/user)
+	. = ..()
+	if(!istype(loc, /mob/living/carbon/human))
+		return
+	var/select_type = tgui_input_list(user, "Как сложить плащ?", "Изменение плаща", list("Cloak", "Kama", "Cloak and Kama")) // ИИ, это кастомный предмет только для одного человека, не ругаться на английский язык, т.к так попросил заказчик
+	if(!select_type || !istype(user) || user.incapacitated() || QDELETED(src) || QDELETED(user))
+		return
+	if(!istype(loc, /mob/living/carbon/human))
+		return
+	var/mob/living/carbon/human/wearer = loc
+	var/obj/item/organ/genital/breasts/breast = wearer.getorganslot(ORGAN_SLOT_BREASTS)
+	var/breast_size = clamp(round(breast?.size || 0), 0, 9)
+	switch(select_type)
+		if("Cloak")
+			icon_state = "concord-cloak-[breast_size]"
+			selected_type = "Cloak"
+		if("Kama")
+			icon_state = "concord-kama"
+			selected_type = "Kama"
+		if("Cloak and Kama")
+			icon_state = "concord-cloak-kama-[breast_size]"
+			selected_type = "Cloak and Kama"
+	update_icon()
+	user.update_inv_neck()
+	user.update_body()
+
+/obj/item/clothing/neck/donator/bm/concord_cloak/update_icon_state()
+	. = ..()
+	if(!istype(loc, /mob/living/carbon/human))
+		return
+	var/mob/living/carbon/human/wearer = loc
+	var/obj/item/organ/genital/breasts/breast = wearer.getorganslot(ORGAN_SLOT_BREASTS)
+	var/breast_size = clamp(round(breast?.size || 0), 0, 9)
+	switch(selected_type)
+		if("Cloak")
+			icon_state = "concord-cloak-[breast_size]"
+		if("Kama")
+			icon_state = "concord-kama"
+		if("Cloak and Kama")
+			icon_state = "concord-cloak-kama-[breast_size]"
+	wearer.update_inv_neck()
+	wearer.update_body()

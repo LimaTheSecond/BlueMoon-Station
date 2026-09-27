@@ -94,7 +94,7 @@
 	var/atom/A = target
 	if(!proximity && prox_check || !(isobj(A) || issilicon(A) || isbot(A) || isdrone(A)))
 		return
-	if(istype(A, /obj/item/storage) && !(istype(A, /obj/item/storage/lockbox) || istype(A, /obj/item/storage/pod)))
+	if(istype(A, /obj/item/storage) && !(istype(A, /obj/item/storage/lockbox) || istype(A, /obj/item/storage/pod) || istype(A, /obj/item/storage/pod_luxury)))
 		return
 	if(!uses)
 		user.visible_message("<span class='warning'>[src] вспыхивает с небольшой искрой. Карта сожжена!</span>")
@@ -117,6 +117,8 @@
 	. = ..()
 	if(mining_points)
 		. += "У карты в наличии [mining_points] ед. очков шахтёрского оборудования."
+	if(contraband_points)
+		. += "У карты в наличии [contraband_points] ед. очков Авангарда"
 	if(registered_account)
 		. += "Привязанный к ID-карте аккаунт записан на имя \"[registered_account.account_holder]\" и сообщает о балансе [registered_account.account_balance] кр."
 		if(registered_account.account_job)
@@ -191,6 +193,7 @@
 	var/id_type_name = "Identification Card"
 	var/mining_points = 0 //For redeeming at mining equipment vendors
 	var/mining_points_total = 0 //Для отслеживания рабты шахтёров
+	var/contraband_points = 0 //BLUEMOON ADD - for BountyVend
 	var/list/access = list()
 	var/registered_name = null // The name registered_name on the card
 	var/assignment = null
@@ -202,6 +205,8 @@
 	var/obj/machinery/paystand/my_store
 	var/uses_overlays = TRUE
 	var/icon/cached_flat_icon
+	/// Asset of cached_flat_icon: registering it hashes the whole icon, so it is done once per look of the card
+	var/cached_flat_icon_asset
 	var/obj/item/card_sticker/sticker //BLUEMOON ADD Стикеры на карточку
 	var/special_assignment = null // BLUEMOOD ADD для особых карт и их HUD, техническое
 
@@ -228,6 +233,7 @@
 		my_store.my_card = null
 		my_store = null
 	cached_flat_icon = null
+	cached_flat_icon_asset = null
 	access = null
 	sticker = null
 	return ..()
@@ -439,6 +445,8 @@
 	. = ..()
 	if(mining_points)
 		. += "У этой карты [mining_points] рудокопных очков карго; всего было заработано [mining_points_total] очков."
+	if(contraband_points)
+		. += "<span class='info'>У этой карты [contraband_points] очков Авангарда.</span>"
 	if(!bank_support || (bank_support == ID_LOCKED_BANK_ACCOUNT && !registered_account))
 		. += "<span class='info'>Эта ID-карта не имеет банковского счёта. Должно быть, устаревшая модель...</span>"
 	else if(registered_account)
@@ -469,23 +477,32 @@
 	return src
 
 /obj/item/card/id/update_overlays()
-    . = ..()
-    if(!uses_overlays)
-        return
-    cached_flat_icon = null
-    var/job = assignment ? ckey(get_job_name()) : null
-    var/list/specialjobs = list(/obj/item/card/id/syndicate/advanced/ds) // Для спец. ролей с уникальными картами
-    job = replacetext(job, " ", "")
-    job = replacetext(job, "-", "") // Для учёта более сложных assigment'ов, как на DS-1/2
-    job = lowertext(job)
-    if(registered_name && registered_name != "Captain" && !is_type_in_list(src, specialjobs))
-        . += mutable_appearance(icon, "assigned")
-    if(job)
-        . += mutable_appearance(icon, "id[job]")
+	. = ..()
+	if(!uses_overlays)
+		return
+	cached_flat_icon = null
+	cached_flat_icon_asset = null
+	var/job = assignment ? ckey(get_job_name()) : null
+	var/list/specialjobs = list(/obj/item/card/id/syndicate/advanced/ds) // Для спец. ролей с уникальными картами
+	job = replacetext(job, " ", "")
+	job = replacetext(job, "-", "") // Для учёта более сложных assigment'ов, как на DS-1/2
+	job = lowertext(job)
+	if(registered_name && registered_name != "Captain" && !is_type_in_list(src, specialjobs))
+		. += mutable_appearance(icon, "assigned")
+	if(job)
+		. += mutable_appearance(icon, "id[job]")
 
 /obj/item/card/id/proc/get_cached_flat_icon()
 	if(!cached_flat_icon)
-		cached_flat_icon = getFlatIcon(src)
+		// Examine ID-карты - обычное действие обычного игрока, и именно на нём умер раунд
+		// 10087 (23.08): getFlatIcon отсюда упал рантаймом в /icon/New(), и мир не написал
+		// больше ни строки. См. code/__HELPERS/icon_alloc_guard.dm.
+		try
+			cached_flat_icon = getFlatIcon(src)
+		catch(var/exception/icon_error)
+			// Результат намеренно НЕ кэшируется: отказ аллокации - состояние минуты, а не
+			// свойство карты, и запомненная пустышка осталась бы в чате до конца раунда.
+			return note_icon_alloc_failure("плоская иконка ID-карты [type]", icon_error)
 	return cached_flat_icon
 
 
@@ -494,8 +511,24 @@
 		var/job_tooltip = ""
 		if(assignment && get_assignment_name() != assignment)
 			job_tooltip = " [span_tooltip_fast(html_encode(assignment))]"
-		return "[icon2html(get_cached_flat_icon(), user)] [thats? "That's ":""][get_examine_name(user)][job_tooltip]" //displays all overlays in chat
+		return "[get_flat_icon_html(user)] [thats? "That's ":""][get_examine_name(user)][job_tooltip]" //displays all overlays in chat
 	return ..()
+
+/obj/item/card/id/proc/get_flat_icon_html(mob/user)
+	if(!user)
+		return
+	if(SSlag_switch.measures[DISABLE_USR_ICON2HTML] && usr && !HAS_TRAIT(usr, TRAIT_BYPASS_MEASURES))
+		return
+	if(!cached_flat_icon_asset || !SSassets.cache[cached_flat_icon_asset])
+		var/icon/flat_icon = get_cached_flat_icon()
+		if(!isicon(flat_icon))
+			return icon2html(flat_icon, user)
+		var/icon/single_frame = icon(flat_icon, "", SOUTH, 1, FALSE)
+		note_flat_icon_built(single_frame)
+		cached_flat_icon_asset = register_icon_asset(single_frame, null, list(user))
+	else
+		SSassets.transport.send_assets(user, cached_flat_icon_asset)
+	return "<img class='icon icon-' src='[SSassets.transport.get_asset_url(cached_flat_icon_asset)]'>"
 
 /obj/item/card/id/proc/update_label(newname, newjob)
 	var/effective_name = newname ? newname : registered_name
@@ -1023,6 +1056,16 @@
 /obj/item/card/id/departmental_budget/sec
 	department_ID = ACCOUNT_SEC
 	department_name = ACCOUNT_SEC_NAME
+
+/obj/item/card/id/departmental_budget/tar
+	department_ID = ACCOUNT_TAR
+	department_name = ACCOUNT_TAR_NAME
+	withdraw_allowed = TRUE // BLUEMOON ADD - снятие разрешено любому держателю карты
+
+/obj/item/card/id/departmental_budget/ds
+	department_ID = ACCOUNT_DS
+	department_name = ACCOUNT_DS_NAME
+	withdraw_allowed = TRUE // BLUEMOON ADD - снятие разрешено любому держателю карты
 
 //Polychromatic Knight Badge
 

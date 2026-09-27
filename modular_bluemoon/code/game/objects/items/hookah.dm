@@ -73,7 +73,10 @@
 
 /obj/item/clothing/mask/hookah_hose/equipped(mob/user, slot, initial)
 	. = ..()
-	RegisterSignal(user, COMSIG_MOVABLE_MOVED, PROC_REF(on_mob_move))
+	// Перевесить шланг из рук в слот маски это второй equipped() без dropped() между ними,
+	// то есть повторная регистрация на том же мобе. Обработчик идемпотентный - просто
+	// перерисовывает луч, - так что переподписка законна, а без override она рантаймит
+	RegisterSignal(user, COMSIG_MOVABLE_MOVED, PROC_REF(on_mob_move), override = TRUE)
 
 /obj/item/clothing/mask/hookah_hose/dropped(mob/user)
 	. = ..()
@@ -131,7 +134,7 @@
 		to_chat(user, span_warning("Колба опустела!"))
 		return
 	user.visible_message(span_notice("[user] делает глубокую затяжку."), span_notice("Вы делаете глубокую затяжку."))
-	playsound(user, 'modular_bluemoon/sound/effects/hookah_inhale.ogg', 40, TRUE) // затяжка плейсхолдер
+	playsound(user, 'sound/effects/bubbles.ogg', 40, TRUE) // затяжка плейсхолдер
 
 	// Усиленная доза
 	var/fraction = min(REAGENTS_METABOLISM * 3 / hookah.reagents.total_volume, 1)

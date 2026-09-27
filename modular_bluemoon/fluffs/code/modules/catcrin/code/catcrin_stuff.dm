@@ -6,7 +6,7 @@
 "cupteazee", "nopeingeneer", "silyamg", "lomodno", "valsons", "nyctealust", "abrikos", \
 "spoopyman228", "stasdvrz", "shizalrp", "tblkba", "dragon9090", "avtobuspng", "ninjapikachushka", \
 "ailhate", "kingdeaths", "mentaleater", "lindaastereih", "gevaitrouble", "angelnedemon", "fryktik", "ivanokio", \
-"blatoff", "regiska", "lander231" \
+"blatoff", "regiska", "lander231", "exkessa" \
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////Слот головы.
@@ -313,6 +313,12 @@
 	product = /obj/item/clothing/suit/space/hardsuit/security/mark46_sec
 	fromitem = list(/obj/item/clothing/suit/space/hardsuit/security)
 
+/obj/item/modkit/mark45_kit
+	name = "Catcrin MOD suit"
+	desc = "A modkit for making a security MODsuit into a Mark 45 MOD suit armor."
+	product = /obj/item/mod/control/pre_equipped/security/catcrin
+	fromitem = list(/obj/item/mod/control/pre_equipped/security)
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////// Слот шеи.
 
 /obj/item/clothing/neck/tie/maskchalat
@@ -337,12 +343,12 @@
 	icon_state = "multiphasecarabin"
 	ammo_type = list(/obj/item/ammo_casing/energy/disabler/karabiner_m13, /obj/item/ammo_casing/energy/laser/hos/karabiner_m13, /obj/item/ammo_casing/energy/ion/hos/karabiner_m13, /obj/item/ammo_casing/energy/electrode/hos/karabiner_m13)
 	ammo_x_offset = 0
-	pickup_sound = "modular_bluemoon/flaffs/sound/weapon/Karabiner-M13/GrabCarabine.ogg"
+	pickup_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/Karabiner-M13/GrabCarabine.ogg'
 	flight_x_offset = 25
 	flight_y_offset = 5
 
 /obj/item/ammo_casing/energy/disabler/karabiner_m13
-	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/Karabiner-M13/DisablerOni.ogg'
+	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/H-Wal-2572/DisablerOni.ogg'
 
 /obj/item/ammo_casing/energy/laser/hos/karabiner_m13
 	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/Karabiner-M13/LaserOni.ogg'
@@ -351,7 +357,7 @@
 	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/Karabiner-M13/IonOni.ogg'
 
 /obj/item/ammo_casing/energy/electrode/hos/karabiner_m13
-	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/Karabiner-M13/TaserOni.ogg'
+	fire_sound = 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/weapons/H-Wal-2572/TaserOni.ogg'
 
 /obj/item/modkit/karabiner_kit
 	name = "Karabiner-M13 Kit"
@@ -593,9 +599,16 @@
 	icon_state = "syndicate_cool"
 	mutantrace_variation = STYLE_DIGITIGRADE|STYLE_NO_ANTHRO_ICON
 	actions_types = list(/datum/action/item_action/maskhalt)
+	var/static/list/halt_sounds = list(
+		'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt0.ogg',
+		'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt1.ogg',
+		'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt2.ogg',
+		'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt3.ogg'
+	)
 
-/datum/action/item_action/maskhalt
-	name = "HALT!"
+/obj/item/clothing/mask/gas/syndicate/cool_version/ui_action_click(mob/user, action)
+	if(istype(action, /datum/action/item_action/maskhalt))
+		maskhalt()
 
 /obj/item/clothing/mask/gas/syndicate/cool_version/verb/maskhalt()
 	set category = "Object"
@@ -606,24 +619,18 @@
 	if(!can_use(usr))
 		return
 
-	var/frase
-	frase = input("Какую фразу вы хотите сказать через преобразователь в маске?","") as text
+	var/phrase = input("Какую фразу вы хотите сказать через преобразователь в маске?","") as text
+	phrase = reject_bad_text(phrase)
+	if(!phrase)
+		return
 
-	if(frase)
-		usr.audible_message("<b>[usr]</b> exclaims, \"<font color='red' size='4'><b>[frase]</b></font>\"")
-		switch(rand(0,3))
-			if(0)
-				playsound(src.loc, 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt0.ogg', 100, 1)
-			if(1)
-				playsound(src.loc, 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt1.ogg', 100, 1)
-			if(2)
-				playsound(src.loc, 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt2.ogg', 100, 1)
-			if(3)
-				playsound(src.loc, 'modular_bluemoon/fluffs/code/modules/catcrin/sounds/misc/catcrin_halt3.ogg', 100, 1)
+	usr.say(message = phrase, spans = list("big warning"))
+	playsound(src.loc, pick(halt_sounds), 100, 1)
 
-/obj/item/clothing/mask/gas/syndicate/cool_version/ui_action_click(mob/user, action)
-	if(istype(action, /datum/action/item_action/maskhalt))
-		maskhalt()
+/datum/action/item_action/maskhalt
+	name = "HALT!"
+
+///////////////////////////////////////////////////
 
 /obj/item/clothing/mask/gas/syndicate/cool_version/catcrin_combatmask_one
 	name = "Tactical combat Catcrin gasmask"
@@ -693,6 +700,7 @@
 	new /obj/item/modkit/magrrinei_kit(src)
 	new /obj/item/modkit/ffshield(src)
 	new /obj/item/modkit/hopesh_kit(src)
+	new /obj/item/modsuit_modkit/catcrin(src)
 	new /obj/item/modkit/mark46_kit(src)
 	new /obj/item/sign/flag/catcrin(src)
 	new /obj/item/banner/catcrin(src)

@@ -90,7 +90,15 @@
 					stamina_heal = healing_power, \
 					blood_heal = healing_power, \
 					rad_heal = healing_power, \
-					organ_healing = list(ORGAN_SLOT_BRAIN = healing_power), \
+					organ_healing = list(ORGAN_SLOT_BRAIN = healing_power,
+										ORGAN_SLOT_APPENDIX = healing_power,
+										ORGAN_SLOT_STOMACH = healing_power,
+										ORGAN_SLOT_EARS = healing_power,
+										ORGAN_SLOT_EYES = healing_power,
+										ORGAN_SLOT_LUNGS = healing_power,
+										ORGAN_SLOT_HEART = healing_power,
+										ORGAN_SLOT_LIVER = healing_power,
+										ORGAN_SLOT_TONGUE = healing_power), \
 					simple_heal = healing_power, \
 					healing_color = COLOR_ORANGE, \
 					stackable = FALSE, \
@@ -186,7 +194,7 @@
 	var/image/fog_animation = image('icons/effects/chemsmoke.dmi', src, "", layer = GASFIRE_LAYER, pixel_x = -32, pixel_y = -32)
 	fog_animation.color = COLOR_LIGHT_ORANGE
 	fog_animation.alpha = 150
-	flick_overlay(fog_animation, GLOB.clients, 7 SECONDS)
+	flick_overlay_view(fog_animation, 7 SECONDS)
 	var/user_alpha = user.alpha
 	animate(user, alpha = 10, 5 SECONDS)
 	stoplag(6 SECONDS)
@@ -200,7 +208,7 @@
 		fog_animation = image('icons/effects/chemsmoke.dmi', travel_to, "", layer = GASFIRE_LAYER, pixel_x = -32, pixel_y = -32)
 		fog_animation.color = COLOR_LIGHT_ORANGE
 		fog_animation.alpha = 150
-		flick_overlay(fog_animation, GLOB.clients, 6 SECONDS)
+		travel_to.flick_overlay_view(fog_animation, 6 SECONDS)
 	else
 		to_chat(user, span_warning("Что-то случилось... перемещение не удалось."))
 	if(user.alpha == 10) // если за 6 секунд прозрачность перонажа изменилась по неизвестным причинам, то лучше не трогать

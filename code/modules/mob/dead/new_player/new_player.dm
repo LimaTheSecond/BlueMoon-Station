@@ -1,5 +1,6 @@
 /mob/dead/new_player
 	var/ready = 0
+	var/ready_reward_pending = FALSE
 	///Referenced when you want to delete the new_player later on in the code.
 	var/spawning = 0
 
@@ -35,6 +36,13 @@
 
 /mob/dead/new_player/Destroy()
 	GLOB.new_player_list -= src
+	//очередь распределения ролей сбрасывается только в ResetOccupations, которого
+	//в нормальном раунде не бывает: ушедший из лобби игрок оставался в ней до конца
+	if(SSjob)
+		SSjob.unassigned -= src
+	//очередь ожидания на вход при переполнении - тот же случай
+	if(SSticker)
+		SSticker.queued_players -= src
 
 	return ..()
 
@@ -251,6 +259,7 @@
 	if(href_list["JoinAsGhostRole"])
 		if(!GLOB.enter_allowed)
 			to_chat(usr, "<span class='notice'> There is an administrative lock on entering the game!</span>")
+			return
 
 		//Determines Relevent Population Cap
 		var/relevant_cap
@@ -268,9 +277,13 @@
 
 		var/list/spawner_list = GLOB.mob_spawners[href_list["JoinAsGhostRole"]]
 		if(!length(spawner_list))
+			// Молчаливый выход отсюда выглядел как "кнопка не работает": игрок кликал по
+			// живой роли, а ключ до сервера не доезжал (см. url_encode в LateChoices()).
+			to_chat(usr, "<span class='warning'>Эта роль больше недоступна.</span>")
 			return
 		var/obj/effect/mob_spawn/MS = pick(spawner_list)
 		if(!MS || !istype(MS, /obj/effect/mob_spawn))
+			to_chat(usr, "<span class='warning'>Эта роль больше недоступна.</span>")
 			return
 		if(MS.attack_ghost(src, latejoinercalling = TRUE))
 			SSticker.queued_players -= src
@@ -366,6 +379,7 @@
 /mob/dead/new_player/proc/make_me_an_observer()
 	if(QDELETED(src) || !src.client)
 		ready = PLAYER_NOT_READY
+		ready_reward_pending = FALSE
 		return FALSE
 
 	var/mintime = max(CONFIG_GET(number/respawn_delay) * 600, (SSticker.round_start_time + (CONFIG_GET(number/respawn_minimum_delay_roundstart) * 600)) - world.time, 0)
@@ -374,6 +388,7 @@
 
 	if(QDELETED(src) || !src.client || this_is_like_playing_right != "Да")
 		ready = PLAYER_NOT_READY
+		ready_reward_pending = FALSE
 		src << browse(null, "window=playersetup") //closes the player setup window
 		new_player_panel()
 		return FALSE
@@ -545,6 +560,8 @@
 	//sandstorm change
 	if(humanc)
 		SSlanguage.AssignLanguage(humanc, humanc.client, TRUE, FALSE, job, FALSE)
+		// Снапшот в манифест снят до квирков и post_copy_to - догоняем его здесь.
+		GLOB.data_core.refresh_manifest_photo_source(humanc)
 
 	log_manifest(character.mind.key,character.mind,character,latejoin = TRUE)
 
@@ -561,17 +578,17 @@
 	if((client.prefs.toggles & MIDROUND_ANTAG) && !(client.prefs.toggles & NO_ANTAG))
 		if(alert(src, "У вас включена возможность стать антагонистом посреди раунда. Вы уверены, что не хотите выключить её?", "...клянусь, что не сдам роль...", "Я готов", "Прошу временно отключить") == "Прошу временно отключить")
 			client.prefs.toggles ^= MIDROUND_ANTAG
-			to_chat(src, "<span class='redtext'>На этот раунд, у вас отключена возможность стать антагонистом посреди раунда (её можно включить в Character Setup > Preferences).</span>")
+			to_chat(src, "<span class='redtext'>На этот раунд, у вас отключена возможность стать антагонистом посреди раунда (её можно настроить в Параметрах Игры > Антагонисты).</span>")
 	// BLUEMOON ADD END
 
-	var/dat = "<div class='notice'>Round Duration: [DisplayTimeText(world.time - SSticker.round_start_time)]<br>Alert Level: [capitalize(SECURITY_LEVEL_NAME(GLOB.security_level) || SECURITY_LEVEL_NAME(SEC_LEVEL_GREEN))]</div>"
+	var/dat = "<div class='notice'>Длительность раунда: [DisplayTimeText(world.time - SSticker.round_start_time)]<br>Уровень тревоги: <b>[capitalize(SECURITY_LEVEL_COLORED(GLOB.security_level) || SECURITY_LEVEL_COLORED(SEC_LEVEL_GREEN))]</b></div>"
 	if(SSshuttle.emergency)
 		switch(SSshuttle.emergency.mode)
 			if(SHUTTLE_ESCAPE)
-				dat += "<div class='notice red'>The station has been evacuated.</div><br>"
+				dat += "<div class='notice red'>Экипаж станции эвакуировался.</div><br>"
 			if(SHUTTLE_CALL)
 				if(!SSshuttle.canRecall())
-					dat += "<div class='notice red'>The station is currently undergoing evacuation procedures.</div><br>"
+					dat += "<div class='notice red'>Станция сейчас проводит процедуру эвакуации экипажа.</div><br>"
 	for(var/datum/job/prioritized_job in SSjob.prioritized_jobs)
 		if(prioritized_job.current_positions >= prioritized_job.total_positions)
 			SSjob.prioritized_jobs -= prioritized_job
@@ -580,9 +597,11 @@
 	var/free_space = 0
 	for(var/list/category in list(GLOB.command_positions) + list(GLOB.supply_positions) + list(GLOB.engineering_positions) + list(GLOB.nonhuman_positions - "pAI") + list(GLOB.civilian_positions) + list(GLOB.law_positions) + list(GLOB.medical_positions) + list(GLOB.science_positions) + list(GLOB.security_positions))
 		var/cat_color = "fff" //random default
+		var/department_type = SSjob.name_occupations[category[1]].exp_type_department
+		var/department_title = GLOB.exp_type_department_ru[department_type] || department_type
 		cat_color = SSjob.name_occupations[category[1]].selection_color //use the color of the first job in the category (the department head) as the category color
 		dat += "<fieldset style='width: 185px; border: 2px solid [cat_color]; display: inline'>"
-		dat += "<legend align='center' style='color: [cat_color]'>[SSjob.name_occupations[category[1]].exp_type_department]</legend>"
+		dat += "<legend align='center' style='color: [cat_color]'>[department_title]</legend>"
 
 		var/list/dept_dat = list()
 		for(var/job in category)
@@ -606,11 +625,11 @@
 				else
 					dept_dat += "<a class='job[command_bold]' style='display:block;width:170px' href='byond://?src=[REF(src)];SelectedJob=[job_datum.title]'>[job_datum.title] ([num_positions_current]/[num_positions_total])"
 				if(client && client.prefs && client?.prefs?.alt_titles_preferences[job_datum.title])
-					dept_dat += "<br><span style='color:#BBBBBB; font-style: italic;'>as [client?.prefs?.alt_titles_preferences[job_datum.title]]</span>"
+					dept_dat += "<br><span style='color:#BBBBBB; font-style: italic;'>как [client?.prefs?.alt_titles_preferences[job_datum.title]]</span>"
 				dept_dat += "</a>"
 
 		if(!dept_dat.len)
-			dept_dat += "<span class='nopositions'>No positions open.</span>"
+			dept_dat += "<span class='nopositions'>Нет доступных вакансий.</span>"
 		dat += jointext(dept_dat, "")
 		dat += "</fieldset><br>"
 		column_counter++
@@ -636,7 +655,7 @@
 		break
 
 	if(!available_ghosts)
-		dat += "<div class='notice red'>There are currently no open ghost spawners.</div>"
+		dat += "<div class='notice red'>В настоящее время нет гост-спавнеров.</div>"
 	else
 		var/list/categorizedJobs = list("Ghost Role" = list(jobs = list(), titles = GLOB.mob_spawners, color = "#ffffff"))
 		for(var/spawner in GLOB.mob_spawners)
@@ -655,13 +674,17 @@
 			dat += "<fieldset style='border: 2px solid [color]; display: inline'>"
 			dat += "<legend align='center' style='color: [color]'>[jobcat]</legend>"
 			for(var/spawner in categorizedJobs[jobcat]["jobs"])
-				dat += "<a class='otherPosition' style='display:block;width:170px' href='byond://?src=[REF(src)];JoinAsGhostRole=[spawner]'>[spawner]</a>"
+				// url_encode обязателен: ключ спавнера - это его job_description, и апостроф
+				// внутри него закрывал одинарную кавычку атрибута href. Браузер обрезал ссылку
+				// по апострофу, сервер получал усечённый ключ, GLOB.mob_spawners[...] давал null,
+				// и роль была недоступна из лобби весь раунд.
+				dat += "<a class='otherPosition' style='display:block;width:170px' href='byond://?src=[REF(src)];JoinAsGhostRole=[url_encode(spawner)]'>[spawner]</a>"
 
 			dat += "</fieldset><br>"
 		dat += "</td></tr></table></center>"
 		dat += "</div></div>"
 
-	var/datum/browser/popup = new(src, "latechoices", "Choose Profession", 720, 600)
+	var/datum/browser/popup = new(src, "latechoices", "Выберите профессию", 720, 600)
 	popup.add_stylesheet("playeroptions", 'html/browser/playeroptions.css')
 	popup.set_content(jointext(dat, ""))
 	popup.open(FALSE) // FALSE is passed to open so that it doesn't use the onclose() proc
@@ -714,6 +737,10 @@
 /mob/dead/new_player/proc/transfer_character(late_transfer = FALSE)
 	. = new_character
 	if(.)
+		var/award_ready_metadollar = ready_reward_pending
+		if(award_ready_metadollar)
+			ready_reward_pending = FALSE
+			SSmetadollars.metadollar_adjust(1, src.ckey, src.key)
 		new_character.key = key		//Manually transfer the key to log them in
 		//splurt change
 		if(jobban_isbanned(new_character, "pacifist"))
@@ -722,6 +749,8 @@
 		//
 		new_character.stop_sound_channel(CHANNEL_LOBBYMUSIC)
 		SEND_SIGNAL(new_character, COMSIG_MOB_CLIENT_JOINED_FROM_LOBBY, new_character?.client, late_transfer)
+		if(award_ready_metadollar)
+			to_chat(new_character, span_notice("Вы получили 1 метадоллар за готовность к раунду!"))
 		new_character = null
 		qdel(src)
 

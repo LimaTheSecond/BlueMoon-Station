@@ -182,14 +182,15 @@
 		"arachnid_mandibles"	= pick(GLOB.arachnid_mandibles_list),
 		"taur"				= "None",
 		"mam_body_markings" = list(),
-		"emissive_eyes" = FALSE,
+		"allow_emissives" = FALSE,
+		"emissive_parts" = list(),
 		"mam_ears" 			= snowflake_ears_list ? pick(snowflake_ears_list) : "None",
 		"mam_snouts"		= snowflake_mam_snouts_list ? pick(snowflake_mam_snouts_list) : "None",
 		"mam_tail"			= snowflake_mam_tails_list ? pick(snowflake_mam_tails_list) : "None",
 		"mam_tail_animated" = "None",
-		"xenodorsal" 		= "Standard",
-		"xenohead" 			= "Standard",
-		"xenotail" 			= "Xenomorph Tail",
+		"xenodorsal"		= "None",
+		"xenohead"			= "None",
+		"xenotail"			= "Xenomorph Tail",
 		"hardsuit_with_tail" = FALSE,
 		"genitals_use_skintone"	= FALSE,
 		"has_cock"			= FALSE,
@@ -707,6 +708,12 @@ GLOBAL_LIST_EMPTY(species_datums)
 		if("hemi") return "двойной член"
 		if("hemiknot") return "двойной узловатый член"
 		if("bhemiknot") return "двойной с узлами колючий член"
+		if("pede_segmented") return "сегментированный член"
+		if("pede_hemi") return "двойной сегментированный член"
+		if("pede_knotted") return "узловатый сегментированный член"
+		if("pede_barbed") return "шипованный сегментированный член"
+		if("pede_ovipositor") return "яйцеклад"
+		if("pede_hose") return "гофрированный член-трубка"
 
 		else return "необычной формы член"
 

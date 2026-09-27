@@ -29,7 +29,6 @@
 	var/datum/gas_mixture/moderator_internal
 	var/list/moderator_scrubbing = list(GAS_HELIUM)
 	var/moderator_filtering_rate = 20
-	var/fusion_filtering_rate = 20 /// Legacy; no longer used for waste removal
 	var/datum/hfr_fuel/selected_fuel
 
 	var/energy = 0
@@ -88,6 +87,17 @@
 	var/warning_damage_flags = NONE
 	/// Last world.time when overmole (5000+) integrity damage was applied
 	var/last_overmole_damage = 0
+
+	/// Кто и что последним дёргал машину. Пишется на любое действие игрока (log_hfr_action)
+	/// и уходит в лог при аварии - по раунду без записи в лог найти виновника нечем.
+	var/last_touched_by = "nobody"
+	var/last_touched_action = "nothing"
+	var/last_touched_time = 0
+	/// Высший power_level, уже попавший в лог: страница обновляется каждый такт, и без
+	/// этого колебания на границе уровней забили бы лог одинаковыми строками.
+	var/logged_power_level = 0
+	/// world.time последней записанной (не подавленной) правки настройки, по action
+	var/list/last_setting_log = list()
 
 	/// Cached lists reused every process_atmos to avoid allocations (fusion_process)
 	var/list/hfr_fuel_list = list()
@@ -148,4 +158,5 @@
 		internal_pressure = max(internal_pressure, moderator_internal.return_pressure())
 	if(internal_pressure > 0)
 		say("WARNING - Core can contain hazardous gases, deconstruct with caution!")
+	log_hfr_action(user, "started deconstructing [src] at power level [power_level]")
 	return ..(user, tool, internal_pressure)

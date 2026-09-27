@@ -33,6 +33,7 @@
 
 	if(H.internal == src)
 		to_chat(H, "<span class='notice'>Вы закрутили вентиль [src].</span>")
+		playsound(loc, 'sound/mobs/humanoids/breathing/internals_off.ogg', 15, TRUE, SHORT_RANGE_SOUND_EXTRARANGE)
 		H.internal = null
 	else
 		if(!H.getorganslot(ORGAN_SLOT_BREATHING_TUBE))
@@ -58,6 +59,7 @@
 			to_chat(H, "<span class='notice'>Вы подключили свою маску к [src].</span>")
 		else
 			to_chat(H, "<span class='notice'>Вы провернули вентиль [src].</span>")
+		playsound(loc, 'sound/mobs/humanoids/breathing/internals_on.ogg', 15, TRUE, SHORT_RANGE_SOUND_EXTRARANGE)
 		H.internal = src
 	H.update_action_buttons_icon()
 
@@ -315,6 +317,8 @@
 	var/temperature = air_contents.return_temperature()
 
 	if(pressure > TANK_FRAGMENT_PRESSURE)
+		if(src.loc && istype(src.loc, /obj/item/transfer_valve) && SSmapping.level_trait(src.loc.z, ZTRAIT_PACT_SIEGE))
+			return
 		if(!istype(src.loc, /obj/item/transfer_valve))
 			message_admins("Explosive tank rupture! Last key to touch the tank was [src.fingerprintslast].")
 			log_game("Explosive tank rupture! Last key to touch the tank was [src.fingerprintslast].")

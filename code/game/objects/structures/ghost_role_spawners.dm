@@ -886,6 +886,10 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 /obj/effect/mob_spawn/human/pirate/special(mob/living/new_spawn)
 	new_spawn.fully_replace_character_name(new_spawn.real_name,generate_pirate_name())
 	new_spawn.mind.add_antag_datum(/datum/antagonist/pirate)
+	for(var/obj/item/I in new_spawn.get_equipped_items(include_pockets = TRUE))
+		if(istype(I, /obj/item/card/id))
+			continue
+		ADD_TRAIT(I, TRAIT_NODROP, "pirate_antag")
 
 /obj/effect/mob_spawn/human/pirate/proc/generate_pirate_name()
 	var/beggings = strings(PIRATE_NAMES_FILE, "beginnings")
@@ -1060,7 +1064,14 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 			uniform = suited ? /obj/item/clothing/under/color/random : /obj/item/clothing/under/color/jumpskirt/random
 
 /datum/outfit/ghostcafe/post_equip(mob/living/carbon/human/H, visualsOnly = FALSE, client/preference_source)
-	H.internal = H.get_item_for_held_index(1)
+	//баллон в руку кладёт только плазмаменская ветка pre_equip - всем остальным сюда
+	//приезжал случайный предмет, и дыхание каждый тик падало на remove_air_volume()
+	H.internal = null
+	var/obj/item/tank/held_tank = H.get_item_for_held_index(1)
+	if(istype(held_tank))
+		H.internal = held_tank
+	//кнопка внутренних баллонов рисует состояние по H.internal - см. /datum/outfit/equipOutfit
+	H.update_action_buttons_icon()
 
 /obj/item/storage/box/syndie_kit/chameleon/ghostcafe
 	name = "ghost cafe costuming kit"
@@ -1517,7 +1528,7 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 	ears = /obj/item/radio/headset/ds2
 	back = /obj/item/storage/backpack/duffelbag/syndie/backpack
 	backpack_contents = list(
-		/obj/item/storage/box/survival = 1,
+		/obj/item/storage/box/survival/syndie = 1,
 		/obj/item/crowbar/red = 1,
 		)
 	id = /obj/item/card/id/syndicate/advanced/ds
@@ -1541,7 +1552,7 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 	head = /obj/item/clothing/head/soft/sec/syndicate
 	back = /obj/item/storage/backpack/duffelbag/syndie/backpack/eng
 	backpack_contents = list(
-		/obj/item/storage/box/survival = 1,
+		/obj/item/storage/box/survival/syndie = 1,
 		)
 	l_pocket = /obj/item/storage/bag/material
 	r_pocket = /obj/item/storage/bag/construction
@@ -1571,7 +1582,7 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 	id = /obj/item/card/id/syndicate/advanced/ds/stationmed
 	id_trim = /datum/id_trim/syndicom/ds2/medicalofficer
 	backpack_contents = list(
-		/obj/item/storage/box/survival = 1,
+		/obj/item/storage/box/survival/syndie = 1,
 		/obj/item/crowbar/red = 1,
 		/obj/item/storage/firstaid/tactical = 1,
 		)
@@ -1602,7 +1613,7 @@ GLOBAL_LIST_EMPTY(ashwalker_spawns)
 	ears = /obj/item/radio/headset/ds2/command
 	back = /obj/item/storage/backpack/duffelbag/syndie/backpack/com
 	backpack_contents = list(
-		/obj/item/storage/box/survival = 1,
+		/obj/item/storage/box/survival/syndie = 1,
 		/obj/item/crowbar/red = 1,
 		/obj/item/lighter/gonzofist = 1)
 	id = /obj/item/card/id/syndicate/advanced/ds/gold/command

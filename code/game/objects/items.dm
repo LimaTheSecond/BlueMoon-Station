@@ -27,6 +27,10 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 	var/jitter = 0
 	var/dizzy = 0
 	var/stuttering = 0
+	/// Кэш иконки кровавого пятна: собирается один раз на предмет из его initial(icon_state)
+	/// и лежит здесь, чтобы cut_overlay() снимал ровно тот оверлей, который добавили.
+	/// Раньше стоял на /atom, то есть в каждом турфе мира, при трёх читателях - и все три тут.
+	var/icon/blood_splatter_icon
 	///icon state name for inhand overlays
 	var/item_state = null
 	//Название хвоста-картинки из tail_digi.dmi
@@ -35,6 +39,13 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 	var/lefthand_file = 'icons/mob/inhands/items_lefthand.dmi'
 	///Icon file for right inhand overlays
 	var/righthand_file = 'icons/mob/inhands/items_righthand.dmi'
+
+	/// Угол иконки для колющих и режущих анимаций атаки, по часовой от спрайта, смотрящего на восток
+	var/icon_angle = 0
+	/// Файл альтернативной иконки для анимации атаки
+	var/attack_icon
+	/// Стейт альтернативной иконки для анимации атаки
+	var/attack_icon_state
 
 	///Icon file for mob worn overlays.
 	///no var for state because it should *always* be the same as icon_state
@@ -75,6 +86,8 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 	var/pickup_sound
 	///Sound uses when dropping the item, or when its thrown.
 	var/drop_sound
+	///Sound uses when the item lands after being thrown. Overrides drop_sound.
+	var/throw_drop_sound
 	///Whether or not we use stealthy audio levels for this item's attack sounds
 	var/stealthy_audio = FALSE
 
@@ -233,8 +246,11 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 	if(ismob(loc) && !QDELING(loc))
 		var/mob/m = loc
 		m.temporarilyRemoveItemFromInventory(src, TRUE)
-	for(var/X in actions)
-		qdel(X)
+	// QDEL_LIST, а не ручной цикл: /datum/action/Destroy() вычёркивает себя из actions, и
+	// обход живого списка пропускал каждое второе действие. Плюс сам список обязан
+	// обнулиться - иначе предмет держит ссылки на уже удалённые датумы действий.
+	QDEL_LIST(actions)
+	actions = null
 	return ..()
 
 /obj/item/ComponentInitialize()
@@ -607,6 +623,7 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 /obj/item/proc/equipped(mob/user, slot, initial = FALSE)
 	SHOULD_CALL_PARENT(TRUE)
 	var/signal_flags = SEND_SIGNAL(src, COMSIG_ITEM_EQUIPPED, user, slot)
+	SEND_SIGNAL(user, COMSIG_MOB_EQUIPPED_ITEM, src, slot)
 	current_equipped_slot = slot
 	if(!(signal_flags & COMPONENT_NO_GRANT_ACTIONS))
 		for(var/X in actions)
@@ -799,8 +816,8 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 			else
 				SSthrowing.playsound_capped(hit_atom, 'sound/weapons/throwtap.ogg', 1, volume, -1)
 
-		else if (drop_sound)
-			SSthrowing.playsound_capped(src, drop_sound, YEET_SOUND_VOLUME, ignore_walls = FALSE)
+		else if (throw_drop_sound || drop_sound)
+			SSthrowing.playsound_capped(src, throw_drop_sound || drop_sound, YEET_SOUND_VOLUME, ignore_walls = FALSE)
 		return hit_atom.hitby(src, 0, itempush, throwingdatum=throwingdatum)
 
 /obj/item/throw_at(atom/target, range, speed, mob/thrower, spin=1, diagonals_first = 0, datum/callback/callback, force, messy_throw = TRUE, quickstart = TRUE)
@@ -820,11 +837,11 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 		pixel_x = rand(-8, 8)
 		pixel_y = rand(-8, 8)
 
-/obj/item/proc/randomize_pixel_position()
+/obj/item/proc/randomize_pixel_position(atom/movable/dropped_by)
 	if(item_flags & NO_PIXEL_RANDOM_DROP)
 		return
-	pixel_x = base_pixel_x + rand(-6, 6)
-	pixel_y = base_pixel_y + rand(-6, 6)
+	pixel_x = clamp((base_pixel_x + dropped_by?.pixel_x + rand(-6, 6)), -16, 16)
+	pixel_y = clamp((base_pixel_y + dropped_by?.pixel_y + rand(-6, 6)), -16, 16)
 
 /obj/item/proc/remove_item_from_storage(atom/newLoc) //please use this if you're going to snowflake an item out of a obj/item/storage
 	if(!newLoc)
@@ -886,6 +903,162 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 
 /obj/item/proc/get_sharpness()
 	return sharpness
+
+/obj/item/proc/animate_attack(atom/movable/attacker, atom/attacked_atom, animation_type)
+	var/list/image_override = list()
+	var/list/animation_override = list()
+	var/used_icon_angle = icon_angle
+	var/list/angle_override = list()
+	SEND_SIGNAL(src, COMSIG_ITEM_ATTACK_ANIMATION, attacker, attacked_atom, animation_type, image_override, animation_override, angle_override)
+	var/image/attack_image = null
+	if(!length(image_override))
+		attack_image = isnull(attack_icon) ? image(icon = src) : image(icon = attack_icon, icon_state = attack_icon_state)
+	else
+		attack_image = image_override[1]
+
+	if(length(animation_override))
+		animation_type = animation_override[1]
+	else if(!animation_type)
+		switch(get_sharpness())
+			if(SHARP_EDGED)
+				animation_type = ATTACK_ANIMATION_SLASH
+			if(SHARP_POINTY)
+				animation_type = ATTACK_ANIMATION_PIERCE
+			else
+				animation_type = ATTACK_ANIMATION_BLUNT
+
+	if(length(angle_override))
+		used_icon_angle = angle_override[1]
+
+	attack_image.plane = attacked_atom.plane + 1
+	attack_image.pixel_w = attacker.base_pixel_x - attacked_atom.base_pixel_x
+	attack_image.pixel_z = attacker.base_pixel_y - attacked_atom.base_pixel_y
+	attack_image.transform *= 0.5
+	attack_image.appearance_flags = APPEARANCE_UI
+
+	var/atom/movable/flick_visual/attack = attacked_atom.flick_overlay_view(attack_image, 1 SECONDS)
+	var/matrix/copy_transform = new(attacker.transform)
+	var/x_sign = 0
+	var/y_sign = 0
+	var/direction = get_dir(attacker, attacked_atom)
+	if(direction & NORTH)
+		y_sign = -1
+	else if(direction & SOUTH)
+		y_sign = 1
+
+	if(direction & EAST)
+		x_sign = -1
+	else if(direction & WEST)
+		x_sign = 1
+
+	if(!direction)
+		y_sign = 1
+		x_sign = 0.25 * (prob(50) ? 1 : -1)
+		direction = SOUTH
+
+	switch(animation_type)
+		if(ATTACK_ANIMATION_BLUNT)
+			attack.pixel_x = 14 * x_sign
+			attack.pixel_y = 12 * y_sign
+			animate(attack, alpha = 175, transform = copy_transform.Scale(0.75), pixel_x = 4 * x_sign, pixel_y = 3 * y_sign, time = 0.2 SECONDS)
+			animate(time = 0.1 SECONDS)
+			animate(alpha = 0, time = 0.1 SECONDS, easing = CIRCULAR_EASING|EASE_OUT)
+
+		if(ATTACK_ANIMATION_PIERCE)
+			var/attack_angle = dir2angle(direction) + rand(-7, 7)
+			var/anim_angle = attack_angle - 90 - used_icon_angle
+			var/angle_mult = 1
+			if(x_sign && y_sign)
+				angle_mult = 1.4
+			attack.pixel_x = 22 * x_sign * angle_mult
+			attack.pixel_y = 18 * y_sign * angle_mult
+			attack.transform = attack.transform.Turn(anim_angle)
+			copy_transform = copy_transform.Turn(anim_angle)
+			animate(
+				attack,
+				pixel_x = (22 * x_sign - 12 * sin(attack_angle)) * angle_mult,
+				pixel_y = (18 * y_sign - 8 * cos(attack_angle)) * angle_mult,
+				time = 0.1 SECONDS,
+				easing = CUBIC_EASING|EASE_IN,
+			)
+			animate(
+				attack,
+				alpha = 175,
+				transform = copy_transform.Scale(0.75),
+				pixel_x = (22 * x_sign + 26 * sin(attack_angle)) * angle_mult,
+				pixel_y = (18 * y_sign + 22 * cos(attack_angle)) * angle_mult,
+				time = 0.3 SECONDS,
+				easing = CUBIC_EASING|EASE_OUT,
+			)
+			animate(
+				alpha = 0,
+				pixel_x = -3 * -(x_sign + sin(attack_angle)),
+				pixel_y = -2 * -(y_sign + cos(attack_angle)),
+				time = 0.1 SECONDS,
+				easing = CIRCULAR_EASING|EASE_OUT
+			)
+
+		if(ATTACK_ANIMATION_SLASH)
+			attack.pixel_x = 18 * x_sign
+			attack.pixel_y = 14 * y_sign
+			var/x_rot_sign = 0
+			var/y_rot_sign = 0
+			var/attack_dir = (prob(50) ? 1 : -1)
+			var/anim_angle = dir2angle(direction) - 90 - used_icon_angle
+
+			if(x_sign)
+				y_rot_sign = attack_dir
+			if(y_sign)
+				x_rot_sign = attack_dir
+
+			if(x_sign > 0 || y_sign < 0)
+				attack_dir *= -1
+
+			var/anim_dir = attack_dir
+			if(x_sign && y_sign)
+				if(attack_dir < 0)
+					x_rot_sign = -x_sign * 1.4
+					y_rot_sign = 0
+				else
+					x_rot_sign = 0
+					y_rot_sign = -y_sign * 1.4
+
+				if((x_sign < 0 && y_sign > 0) || (x_sign > 0 && y_sign < 0))
+					anim_dir *= -1
+
+			attack.pixel_x += 10 * x_rot_sign
+			attack.pixel_y += 8 * y_rot_sign
+			attack.transform = attack.transform.Turn(anim_angle - 45 * anim_dir)
+			copy_transform = copy_transform.Scale(0.75)
+			animate(attack, alpha = 175, time = 0.3 SECONDS, flags = ANIMATION_PARALLEL)
+			animate(time = 0.1 SECONDS)
+			animate(alpha = 0, time = 0.1 SECONDS, easing = CIRCULAR_EASING|EASE_OUT)
+
+			animate(attack, transform = copy_transform.Turn(anim_angle + 45 * anim_dir), time = 0.3 SECONDS, flags = ANIMATION_PARALLEL)
+
+			var/x_return = 10 * -x_rot_sign
+			var/y_return = 8 * -y_rot_sign
+
+			if(!x_rot_sign)
+				x_return = 18 * x_sign
+			if(!y_rot_sign)
+				y_return = 14 * y_sign
+
+			var/angle_mult = 1
+			if(x_sign && y_sign)
+				angle_mult = 1.4
+				if(attack_dir > 0)
+					x_return = 8 * x_sign
+					y_return = 14 * y_sign
+				else
+					x_return = 18 * x_sign
+					y_return = 6 * y_sign
+
+			animate(attack, pixel_x = 4 * x_sign * angle_mult, time = 0.2 SECONDS, easing = CIRCULAR_EASING | EASE_IN, flags = ANIMATION_PARALLEL)
+			animate(pixel_x = x_return, time = 0.2 SECONDS, easing = CIRCULAR_EASING | EASE_OUT)
+
+			animate(attack, pixel_y = 3 * y_sign * angle_mult, time = 0.2 SECONDS, easing = CIRCULAR_EASING | EASE_IN, flags = ANIMATION_PARALLEL)
+			animate(pixel_y = y_return, time = 0.2 SECONDS, easing = CIRCULAR_EASING | EASE_OUT)
 
 /obj/item/proc/can_dismember()
 	return can_dismember
@@ -951,7 +1124,7 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 
 /obj/item/proc/on_mob_death(mob/living/L, gibbed)
 
-/obj/item/proc/grind_requirements(obj/machinery/reagentgrinder/R) //Used to check for extra requirements for grinding an object
+/obj/item/proc/grind_requirements(obj/machinery/reagentgrinder/R, silent = FALSE) //Used to check for extra requirements for grinding an object
 	return TRUE
 
  //Called BEFORE the object is ground up - use this to change grind results based on conditions
@@ -1147,8 +1320,7 @@ GLOBAL_VAR_INIT(embedpocalypse, FALSE) // if true, all items will be able to emb
 		if(hand_index)
 			M.held_items[hand_index] = null
 			M.update_inv_hands()
-			if(M.client)
-				M.client.screen -= src
+			M.remove_from_hud_screens(src)
 			layer = initial(layer)
 			plane = initial(plane)
 			appearance_flags &= ~NO_CLIENT_COLOR

@@ -40,12 +40,19 @@
 	cam_screen.del_on_map_removal = FALSE
 	cam_screen.screen_loc = "[map_name]:1,1"
 	cam_plane_masters = list()
+	var/list/_cam_pm_by_plane = list()
 	for(var/plane in subtypesof(/atom/movable/screen/plane_master))
-		var/atom/movable/screen/instance = new plane()
+		var/atom/movable/screen/plane_master/instance = new plane()
 		instance.assigned_map = map_name
 		instance.del_on_map_removal = FALSE
 		instance.screen_loc = "[map_name]:CENTER"
-		cam_plane_masters += instance
+		var/plane_key = "[instance.plane]"
+		var/atom/movable/screen/plane_master/displaced = _cam_pm_by_plane[plane_key]
+		_cam_pm_by_plane[plane_key] = instance
+		if(displaced)
+			qdel(displaced)
+	for(var/key in _cam_pm_by_plane)
+		cam_plane_masters += _cam_pm_by_plane[key]
 	cam_background = new
 	cam_background.assigned_map = map_name
 	cam_background.del_on_map_removal = FALSE
@@ -65,6 +72,23 @@
 		network -= i
 		network += "[idnum][i]"
 
+/// Сеть консоли живёт только в её типе, поэтому сборка из фрейма всегда давала
+/// заводской набор. Читаем настройку с платы - её задают мультитулом и она же
+/// запоминается при разборке.
+/obj/machinery/computer/security/on_construction()
+	. = ..()
+	var/obj/item/circuitboard/computer/security/board = circuit
+	if(istype(board))
+		board.configure_machine(src)
+
+/// Разбор обязан оставить в плате ту сеть, на которой консоль работала, иначе
+/// собранный обратно монитор смотрит в пустоту.
+/obj/machinery/computer/security/on_deconstruction()
+	. = ..()
+	var/obj/item/circuitboard/computer/security/board = circuit
+	if(istype(board))
+		board.network = network?.Copy()
+
 /obj/machinery/computer/security/ui_interact(mob/user, datum/tgui/ui)
 	// Update UI
 	ui = SStgui.try_update_ui(user, src, ui)
@@ -83,6 +107,8 @@
 		if(length(concurrent_users) == 1 && is_living)
 			playsound(src, 'sound/machines/terminal_on.ogg', 25, FALSE)
 			use_power(active_power_usage)
+		for(var/atom/movable/screen/plane_master/PM as anything in cam_plane_masters)
+			PM.backdrop(user)
 		// Register map objects
 		user.client.register_map_obj(cam_screen)
 		for(var/plane in cam_plane_masters)

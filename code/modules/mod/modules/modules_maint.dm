@@ -19,17 +19,18 @@
 	use_power_cost = DEFAULT_CHARGE_DRAIN * 0.5
 	incompatible_modules = list(/obj/item/mod/module/balloon)
 	cooldown_time = 15 SECONDS
+	required_modpart_index = MOD_PART_GLOVES
 
 /obj/item/mod/module/balloon/on_use()
 	. = ..()
 	if(!.)
 		return
-	if(!do_after(mod.wearer, 10 SECONDS, target = mod))
+	if(!do_after(mod.wearer, 5 SECONDS, mod.wearer))
 		return FALSE
 	mod.wearer.adjustOxyLoss(20)
-	playsound(src, 'sound/items/modsuit/inflate_bloon.ogg', 50, TRUE)
-	var/obj/item/toy/balloon = new(get_turf(src))
-	mod.wearer.put_in_hands(balloon)
+	playsound(get_turf(mod.wearer), 'sound/items/modsuit/inflate_bloon.ogg', 50, TRUE)
+	var/obj/item/toy/balloon/new_ballon = new(get_turf(src))
+	mod.wearer.put_in_hands(new_ballon)
 	drain_power(use_power_cost)
 
 ///Paper Dispenser - Dispenses (sometimes burning) paper sheets.
@@ -45,12 +46,13 @@
 	cooldown_time = 5 SECONDS
 	/// The total number of sheets created by this MOD. The more sheets, them more likely they set on fire.
 	var/num_sheets_dispensed = 0
+	required_modpart_index = MOD_PART_GLOVES
 
 /obj/item/mod/module/paper_dispenser/on_use()
 	. = ..()
 	if(!.)
 		return
-	if(!do_after(mod.wearer, 1 SECONDS, target = mod))
+	if(!do_after(mod.wearer, 1 SECONDS, target = mod.wearer))
 		return FALSE
 
 	var/obj/item/paper/crisp_paper = new(get_turf(src))
@@ -88,6 +90,7 @@
 	device = /obj/item/stamp/mod
 	incompatible_modules = list(/obj/item/mod/module/stamp)
 	cooldown_time = 0.5 SECONDS
+	required_modpart_index = MOD_PART_GLOVES
 
 /obj/item/stamp/mod
 	name = "MOD electronic stamp"

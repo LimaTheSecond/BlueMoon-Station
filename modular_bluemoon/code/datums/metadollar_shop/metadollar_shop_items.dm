@@ -24,8 +24,15 @@
 	if(!queue_delivery(C))
 		return FALSE
 	SSmetadollars.metadollar_adjust(-cost, C.ckey, C.key)
+	log_purchase(C)
 	to_chat(C.mob, span_notice("[delivery_message()]"))
 	return TRUE
+
+/datum/metadollar_shop_item/proc/log_purchase(client/C)
+	var/msg = "Метамагазин: [key_name_admin(C)] приобрёл [name] за [cost] М$ (баланс: [SSmetadollars.get_metadollars(C.ckey)] М$, каталог: [catalog ? catalog : "нет"])."
+	log_game(msg)
+	send2adminchat("Metadollar", msg)
+	INVOKE_ASYNC(GLOBAL_PROC, GLOBAL_PROC_REF(send2tgs_adminless_only), "Metadollar", msg, R_ADMIN)
 
 /datum/metadollar_shop_item/proc/queue_delivery(client/C)
 	return FALSE
@@ -172,6 +179,7 @@
 		to_chat(C.mob, span_warning("Недостаточно метадолларов (нужно [cost] М$)."))
 		return TRUE
 	bm_metadollar_global_burn(C.mob)
+	log_purchase(C)
 	message_admins("[key_name_admin(C.mob)] активировал протокол «Пепелище»: обнулены все балансы метадолларов.")
 	log_game("Metadollar total burn: [key_name(C.mob)] wiped all metadollar balances.")
 	for(var/mob/M in GLOB.player_list)
@@ -198,6 +206,13 @@
 	cost = 10
 	catalog = METADOLLAR_CATALOG_LEGIT
 	spawn_type = /obj/item/choice_beacon/box/desk
+
+/datum/metadollar_shop_item/item/medbeam
+	name = "Гражданская Медицинская Пушка"
+	desc = "Ого, лечебные наниты. Круто!"
+	cost = 50
+	catalog = METADOLLAR_CATALOG_LEGIT
+	spawn_type = /obj/item/gun/medbeam/weak
 
 /datum/metadollar_shop_item/item/pet_beacon
 	name = "Маяк питомца"
@@ -314,14 +329,14 @@
 /datum/metadollar_shop_item/item/smokespell_lesser
 	name = "Книга с заклинанием призыва дыма"
 	desc = "Книжка, что при изучении даёт вам возможность использовать заклинание маленького дыма."
-	cost = 80
-	catalog = METADOLLAR_CATALOG_SMUGGLE
+	cost = 25
+	catalog = METADOLLAR_CATALOG_LEGIT
 	spawn_type = /obj/item/book/granter/spell/smoke/lesser
 
 /datum/metadollar_shop_item/item/smokespell_crocin
 	name = "Книга с заклинанием призыва кроцинового дыма"
 	desc = "Книжка, что при изучении даёт вам возможность использовать заклинание кроцинового дыма."
-	cost = 100
+	cost = 50
 	catalog = METADOLLAR_CATALOG_LEGIT
 	spawn_type = /obj/item/book/granter/spell/smoke/crocin
 

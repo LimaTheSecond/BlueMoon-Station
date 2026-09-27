@@ -253,6 +253,86 @@ It's fairly easy to fix if dealing with single letters but not so much with comp
 		. += letter
 	return copytext_char(sanitize(.),1,MAX_MESSAGE_LEN)
 
+/proc/muffledspeech(message, strength = 100)
+	// Сила искажения текста в процентах (0-100)
+	strength = max(0, min(100, strength))
+	if(strength <= 0)
+		return message
+
+	message = html_decode(message)
+
+	var/final_text = ""
+	var/current_word = ""
+
+	// copytext_char для корректной работы с Unicode
+	for(var/i = 1, i <= length_char(message), i++)
+		var/ch = copytext_char(message, i, i+1)
+
+		// Является ли символ разделителем? (пробел, тире, знаки препинания)
+		if(ch in list(" ", "-", "\t", "!", "?", ".", ","))
+			// Прежде чем добавить разделитель, процессим слово
+			if(length(current_word) > 0)
+				current_word = muffledword(current_word, strength)
+				final_text += current_word
+				current_word = ""
+
+			// Оставляем разделитель без изменений и сохраняем структуру речи
+			final_text += ch
+		else
+			// Добавляем букву для обработки слова
+			current_word += ch
+
+	// Не забываем обработать последнее слово в конце
+	if(length(current_word) > 0)
+		current_word = muffledword(current_word, strength)
+		final_text += current_word
+
+	return sanitize(final_text)
+
+/proc/muffledword(word, strength)
+	// Обработка слова и возврат искажённой версии: чем выше strength, тем больше скремблирования
+	var/leng = length_char(word)
+
+	// Короткие слова (1-3 символа) = более агрессивная обработка
+	if(leng <= 3)
+		return muffle_small_word(word, strength)
+
+	var/result = ""
+	for(var/i = 1, i <= leng, i++)
+		var/ch = copytext_char(word, i, i+1)
+
+		if(prob(strength))
+			if(lowertext(ch) in GLOB.vowels_for_muffledspeech)
+				result += "пф"
+			else
+				result += "м"
+		else
+			result += ch
+
+	return result
+
+/proc/muffle_small_word(word, strength)
+	// Для коротких слов (1-3 символа): случайно заменяем слово или добавляем префикс/суффикс к нему в зависимости от рандома
+
+	var/scrambled = ""
+	for(var/i = 1, i <= length_char(word), i++)
+		var/ch = copytext_char(word, i, i+1)
+
+		if(prob(strength))
+			if(lowertext(ch) in GLOB.vowels_for_muffledspeech)
+				scrambled += "пф"
+			else
+				scrambled += "м"
+		else
+			scrambled += ch
+
+	// 40% шанс полностью заменить, 60% сохранить с добавлением префикса/суффикса
+	if(prob(40))
+		return pick(scrambled, "м", "пф")
+	else
+		var/addition = pick("м", "пф", "мпф", "пфм")
+		return pick("[addition][word]", "[word][addition]")
+
 /proc/shake_camera(mob/M, duration, strength=1)
 	set waitfor = FALSE
 	if(!M || !M.client || duration <= 0)
@@ -585,11 +665,32 @@ It's fairly easy to fix if dealing with single letters but not so much with comp
 	)
 
 	logging[smessage_type] += list(entry)
+	trim_individual_log(logging[smessage_type])
 
 	if(client)
 		client.player_details.logging[smessage_type] += list(entry)
+		trim_individual_log(client.player_details.logging[smessage_type])
 
 	..(message, message_type, color, log_globally)
+
+/**
+ * Держит индивидуальный лог в границах: старые записи вытесняются пачкой.
+ *
+ * Лог рос без всякого предела до конца раунда, и запись тут не строка, а ассоциативный
+ * список из тринадцати полей (у /tg/ на этом месте одна строка - тринадцать полей завёл
+ * наш лог-вьювер). Держится он ДВАЖДЫ: у моба и у player_details, причём второй живёт весь
+ * раунд по ckey и переживает смену тела. При сотне игроков это накопитель, растущий строго
+ * пропорционально активности станции, а перепись памяти его не видит: прироста ИНСТАНСОВ
+ * от него нет ни одного, растут только длины списков на уже живых объектах.
+ *
+ * Вытесняется четверть, а не одна запись: Cut(1, 2) на каждом сообщении означал бы сдвиг
+ * всего списка на каждую реплику. Полная история никуда не девается - она в файлах раунда,
+ * а этот лог нужен админу для недавнего, и его же он в лог-вьювере и открывает.
+ */
+/mob/proc/trim_individual_log(list/entries)
+	if(length(entries) <= MOB_INDIVIDUAL_LOG_MAX)
+		return
+	entries.Cut(1, round(MOB_INDIVIDUAL_LOG_MAX / 4) + 1)
 
 /mob/proc/can_hear()
 	. = TRUE

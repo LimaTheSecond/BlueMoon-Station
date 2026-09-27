@@ -68,12 +68,16 @@
 	SIGNAL_HANDLER
 
 	var/atom/movable/AM = parent
+	if(isnull(AM) || QDELETED(AM)) // пассажир может удалить средство, пока компонент ещё жив
+		return
 	if(isnull(dir))
 		dir = AM.dir
 	var/sprite_dir = move_dir_for_riding_sprite(dir)
 	if(!sprite_dir)
 		sprite_dir = AM.dir
-	AM.set_glide_size(DELAY_TO_GLIDE_SIZE(vehicle_move_delay), FALSE)
+	// Диагональ у транспорта стоит вдвое. Ход не от handle_ride() - буксировка, толчок, бросок -
+	// приходит только сюда, и glide по прямой цене оставлял бы спрайт стоять полпути.
+	AM.set_glide_size(DELAY_TO_GLIDE_SIZE(get_step_cost(ISDIAGONALDIR(dir))), FALSE)
 	for(var/i in AM.buckled_mobs)
 		ride_check(i)
 	handle_vehicle_offsets(sprite_dir)
@@ -88,6 +92,8 @@
 	return TRUE
 
 /datum/component/riding/proc/force_dismount_all()
+	if(QDELETED(src))
+		return
 	var/atom/movable/AM = parent
 	for(var/i in AM.buckled_mobs)
 		force_dismount(i)
@@ -213,12 +219,21 @@
 		return EAST
 	return WEST
 
+/// Цена шага транспорта, выровненная по тику.
+///
+/// Диагональ у транспорта стоит вдвое, а не в SQRT_2, как обычный шаг - это его
+/// собственная механика, и трогать её здесь незачем. А вот выровнять итог по
+/// тику надо: шаг проверяется на кулдауне, который опрашивается только на тике,
+/// поэтому дробная цена даёт не дробный интервал, а гуляющий.
+/datum/component/riding/proc/get_step_cost(diagonal)
+	return movement_quantize_delay(vehicle_move_delay * (diagonal ? 2 : 1), world.tick_lag)
+
 /datum/component/riding/proc/handle_ride(mob/user, direction)
 	var/atom/movable/AM = parent
 	if(user && user.incapacitated())
 		Unbuckle(user)
 		return
-	if(world.time < last_vehicle_move + ((last_move_diagonal? 2 : 1) * vehicle_move_delay))
+	if(world.time < last_vehicle_move + get_step_cost(last_move_diagonal))
 		return
 	last_vehicle_move = world.time
 
@@ -233,7 +248,7 @@
 		if(!turf_check(next, current))
 			to_chat(user, "Your \the [AM] can not go onto [next]!")
 			return
-		if(!Process_Spacemove(direction, FALSE) || !isturf(AM.loc))
+		if(!Process_Spacemove(direction) || !isturf(AM.loc))
 			return
 		step(AM, direction)
 
@@ -241,6 +256,15 @@
 			last_move_diagonal = TRUE
 		else
 			last_move_diagonal = FALSE
+
+		// glide обязан покрывать тот интервал, который реально пройдёт. Диагональ
+		// у транспорта стоит вдвое, а glide ставился по прямому ходу - спрайт
+		// доезжал до тайла за половину пути и вторую половину стоял, ожидая
+		// разрешения. На диагональной езде это видно как шаг через раз.
+		//
+		// Ставим после того, как диагональ стала известна: vehicle_moved() успел
+		// отработать внутри step() выше и знал только про прошлый шаг.
+		AM.set_glide_size(DELAY_TO_GLIDE_SIZE(get_step_cost(last_move_diagonal)))
 
 		var/sprite_dir = move_dir_for_riding_sprite(direction)
 		handle_vehicle_offsets(sprite_dir)
@@ -251,7 +275,7 @@
 /datum/component/riding/proc/Unbuckle(atom/movable/M)
 	addtimer(CALLBACK(parent, TYPE_PROC_REF(/atom/movable, unbuckle_mob), M), 0, TIMER_UNIQUE)
 
-/datum/component/riding/proc/Process_Spacemove(direction, continuous_move = FALSE)
+/datum/component/riding/proc/Process_Spacemove(direction)
 	var/atom/movable/AM = parent
 	return override_allow_spacemove || AM.has_gravity()
 
@@ -351,6 +375,8 @@
 	true_belly_riding_interaction = null
 	true_belly_riding_cooldown = 0
 	var/mob/living/carbon/human/H = parent
+	if(isnull(H))
+		return
 	var/datum/action/cooldown/true_belly_riding/belly_riding_action = locate() in H.actions
 	if(belly_riding_action)
 		belly_riding_action.UpdateButtons()
@@ -364,7 +390,7 @@
 		REMOVE_TRAIT(belly_harness, TRAIT_NODROP, RIDING_TRAIT)
 	belly_harness = null
 
-	force_dismount_all()
+	INVOKE_ASYNC(src, PROC_REF(force_dismount_all))
 
 /datum/component/riding/human/proc/rider_moved(datum/source, oldLoc, dir)
 	SIGNAL_HANDLER

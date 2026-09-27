@@ -41,7 +41,14 @@
 	LAssailant = null
 	movespeed_modification = null
 	if(length(progressbars))
-		stack_trace("[src] destroyed with elements in its progressbars list.")
+		//COMSIG_PARENT_QDELETING уходит до Destroy и чистит список через on_user_delete,
+		//так что дожившая до сюда полоска - это do_after, заведённый уже поверх удаляемого
+		//моба. Без перечисления целей понять, чей это do_after, по трейсу невозможно.
+		var/list/leaked = list()
+		for(var/bar_target in progressbars)
+			var/list/bars = progressbars[bar_target]
+			leaked += "[bar_target || "null"] ([islist(bars) ? length(bars) : "не список"])"
+		stack_trace("[src] destroyed with elements in its progressbars list: [leaked.Join(", ")]")
 		progressbars = null
 	if(alerts) //у /mob/oranges_ear списки алертов обнулены на уровне типа
 		for (var/alert in alerts.Copy())
@@ -80,7 +87,7 @@
 /mob/GenerateTag()
 	tag = "mob_[next_mob_id++]"
 
-/atom/proc/prepare_huds()
+/atom/movable/proc/prepare_huds()
 	hud_list = list()
 	for(var/hud in hud_possible)
 		var/hint = hud_possible[hud]
@@ -710,6 +717,9 @@ GLOBAL_VAR_INIT(exploit_warn_spam_prevention, 0)
 /mob/proc/is_muzzled()
 	return FALSE
 
+/mob/proc/get_muzzle_strength()
+	return MUFFLE_NONE
+
 /// Adds this list to the output to the stat browser
 /mob/proc/get_status_tab_items()
 	. = list()
@@ -818,9 +828,13 @@ GLOBAL_VAR_INIT(exploit_warn_spam_prevention, 0)
 
 /mob/proc/swap_hand()
 	var/obj/item/held_item = get_active_held_item()
-	if(SEND_SIGNAL(src, COMSIG_MOB_SWAP_HANDS, held_item) & COMPONENT_BLOCK_SWAP)
-		to_chat(src, "<span class='warning'>Your other hand is too busy holding [held_item].</span>")
-		return FALSE
+	if(!held_item)
+		return TRUE
+	var/datum/component/two_handed/comp = held_item.GetComponent(/datum/component/two_handed)
+	if(comp)
+		if(comp.require_twohands && !calculate_emply_hand_slots())
+			to_chat(src, "<span class='warning'>Your other hand is too busy holding [held_item].</span>")
+			return FALSE
 	return TRUE
 
 /mob/proc/activate_hand(selhand)

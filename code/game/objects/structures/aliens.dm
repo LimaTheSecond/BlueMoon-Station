@@ -103,6 +103,9 @@
  */
 
 #define NODERANGE 3
+#define WEEDS_GROWTH_SCAN_UNPERFORMED -1
+
+GLOBAL_VAR_INIT(alien_weeds_revision, 0)
 
 /obj/structure/alien/weeds
 	gender = PLURAL
@@ -125,6 +128,7 @@
 	pixel_x = -4
 	pixel_y = -4 //so the sprites line up right in the map editor
 	. = ..()
+	AddElement(/datum/element/atmos_sensitive, mapload)
 
 	if(!blacklisted_turfs)
 		blacklisted_turfs = typecacheof(list(
@@ -134,6 +138,7 @@
 			/turf/open/openspace))
 
 	last_expand = world.time + rand(growth_cooldown_low, growth_cooldown_high)
+	GLOB.alien_weeds_revision++
 	if(icon == initial(icon))
 		switch(rand(1,3))
 			if(1)
@@ -142,6 +147,10 @@
 				icon = 'icons/obj/smooth_structures/alien/weeds2.dmi'
 			if(3)
 				icon = 'icons/obj/smooth_structures/alien/weeds3.dmi'
+
+/obj/structure/alien/weeds/Moved()
+	. = ..()
+	GLOB.alien_weeds_revision++
 
 /obj/structure/alien/weeds/proc/expand()
 	var/turf/U = get_turf(src)
@@ -163,6 +172,15 @@
 	if(exposed_temperature > 300)
 		take_damage(5, BURN, 0, 0)
 
+// Flame contact keeps the old 300 K trigger; hot air alone needs a burning
+// room, since lavaland ambient (315-320 K) would otherwise eat ash walker
+// nests without a single flame.
+/obj/structure/alien/weeds/should_atmos_process(datum/gas_mixture/exposed_air, exposed_temperature)
+	return exposed_temperature > ATMOS_EXPOSURE_MINIMUM_TEMPERATURE
+
+/obj/structure/alien/weeds/atmos_expose(datum/gas_mixture/exposed_air, exposed_temperature)
+	take_damage(5, BURN, 0, 0)
+
 //Weed nodes
 /obj/structure/alien/weeds/node
 	name = "glowing resin"
@@ -173,6 +191,12 @@
 	var/lon_range = 4
 	var/node_range = NODERANGE
 	var/weak = FALSE // BLUEMOON ADD - xenohybrids_improvements - если включено, то трава не распространяется
+	/// Незавершённый обход продолжается с прежнего места после исчерпания бюджета тика.
+	var/list/growth_sweep_queue
+	var/next_growth_check = 0
+	var/growth_scan_revision = WEEDS_GROWTH_SCAN_UNPERFORMED
+	var/turf/growth_scan_turf
+	var/growth_scan_range
 
 /obj/structure/alien/weeds/node/Initialize(mapload)
 	icon = 'icons/obj/smooth_structures/alien/weednode.dmi'
@@ -186,15 +210,40 @@
 
 /obj/structure/alien/weeds/node/Destroy()
 	STOP_PROCESSING(SSobj, src)
+	growth_sweep_queue = null
+	growth_scan_turf = null
 	return ..()
 
 /obj/structure/alien/weeds/node/process()
-	for(var/obj/structure/alien/weeds/W in range(node_range, src))
-		if(W.last_expand <= world.time)
-			if(W.expand())
-				W.last_expand = world.time + rand(growth_cooldown_low, growth_cooldown_high)
+	if(!length(growth_sweep_queue))
+		var/turf/source_turf = get_turf(src)
+		if(!source_turf)
+			return
+		// Соседний узел может только отложить рост; новые и перемещённые weeds меняют ревизию.
+		if(world.time < next_growth_check && growth_scan_revision == GLOB.alien_weeds_revision && growth_scan_turf == source_turf && growth_scan_range == node_range)
+			return
+		growth_scan_revision = GLOB.alien_weeds_revision
+		growth_scan_turf = source_turf
+		growth_scan_range = node_range
+		next_growth_check = INFINITY
+		growth_sweep_queue = list()
+		for(var/obj/structure/alien/weeds/weed in range(node_range, src))
+			growth_sweep_queue += weed
+	while(length(growth_sweep_queue))
+		var/obj/structure/alien/weeds/weed = growth_sweep_queue[length(growth_sweep_queue)]
+		growth_sweep_queue.len--
+		if(QDELETED(weed))
+			continue
+		if(weed.last_expand <= world.time)
+			if(weed.expand())
+				weed.last_expand = world.time + rand(growth_cooldown_low, growth_cooldown_high)
+		if(!QDELETED(weed))
+			next_growth_check = min(next_growth_check, weed.last_expand)
+		if(TICK_CHECK)
+			return
 
 #undef NODERANGE
+#undef WEEDS_GROWTH_SCAN_UNPERFORMED
 
 
 /*
@@ -223,6 +272,7 @@
 
 /obj/structure/alien/egg/Initialize(mapload)
 	. = ..()
+	AddElement(/datum/element/atmos_sensitive, mapload)
 	update_icon()
 	if(status == GROWING || status == GROWN)
 		child = new(src)
@@ -304,6 +354,12 @@
 /obj/structure/alien/egg/temperature_expose(datum/gas_mixture/air, exposed_temperature, exposed_volume)
 	if(exposed_temperature > 500)
 		take_damage(5, BURN, 0, 0)
+
+/obj/structure/alien/egg/should_atmos_process(datum/gas_mixture/exposed_air, exposed_temperature)
+	return exposed_temperature > 500
+
+/obj/structure/alien/egg/atmos_expose(datum/gas_mixture/exposed_air, exposed_temperature)
+	take_damage(5, BURN, 0, 0)
 
 
 /obj/structure/alien/egg/HasProximity(atom/movable/AM)

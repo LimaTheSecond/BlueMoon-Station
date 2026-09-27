@@ -76,8 +76,8 @@
 	pixel_x = 28;
 	req_access_txt = "5"
 	},
-/obj/item/gun/medbeam,
-/obj/item/gun/medbeam,
+/obj/item/gun/medbeam/syndicate,
+/obj/item/gun/medbeam/syndicate,
 /turf/open/floor/plasteel/dark,
 /area/shuttle/solfed/corvette)
 "fa" = (
@@ -759,7 +759,7 @@
 /area/shuttle/solfed/corvette)
 "Gs" = (
 /obj/machinery/atmospherics/components/unary/tank/air{
-	piping_layer = 2
+	piping_layer = 3
 	},
 /turf/open/floor/plating,
 /area/shuttle/solfed/corvette)

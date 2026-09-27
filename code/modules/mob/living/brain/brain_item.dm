@@ -21,17 +21,34 @@
 	var/mob/living/brain/brainmob = null
 	var/brain_death = FALSE //if the brainmob was intentionally killed by attacking the brain after removal, or by severe braindamage
 	var/decoy_override = FALSE	//I apologize to the security players, and myself, who abused this, but this is going to go.
+	var/changeling_original_vital
+	var/changeling_original_decoy
 	//two variables necessary for calculating whether we get a brain trauma or not
 	var/damage_delta = 0
 
 	var/list/datum/brain_trauma/traumas = list()
 
-/obj/item/organ/brain/Insert(mob/living/carbon/C, special = 0,no_id_transfer = FALSE, drop_if_replaced = TRUE)
-	..()
+/obj/item/organ/brain/Insert(mob/living/carbon/C, special = 0, no_id_transfer = FALSE, drop_if_replaced = TRUE)
+	// Аргументы родителю пересобираются, а не пробрасываются как есть: третий позиционный
+	// у него - drop_if_replaced, а у мозга - no_id_transfer, поэтому голый ..() отдавал ему
+	// FALSE, и старый мозг не выпадал на пол, а удалялся вместе с brainmob, унося разум
+	// владельца безвозвратно.
+	. = ..(C, special, drop_if_replaced)
+	// Родитель отказал (не карбон, либо мозг уже стоит в этом теле) - тело нам не принадлежит,
+	// и переименование, QDEL_NULL(brainmob) и перенос разума выполнять нельзя.
+	if(!.)
+		return
 
 	name = "brain"
 
-	if(C.mind && C.mind.has_antag_datum(/datum/antagonist/changeling) && !no_id_transfer)	//congrats, you're trapped in a body you don't control
+	var/is_changeling = C.mind?.has_antag_datum(/datum/antagonist/changeling)
+	if(is_changeling)
+		changeling_original_vital = organ_flags & ORGAN_VITAL
+		changeling_original_decoy = decoy_override
+		organ_flags &= ~ORGAN_VITAL
+		decoy_override = TRUE
+
+	if(is_changeling && !no_id_transfer)	//congrats, you're trapped in a body you don't control
 		if(brainmob && !(C.stat == DEAD || (HAS_TRAIT(C, TRAIT_DEATHCOMA))))
 			to_chat(brainmob, "<span class = danger>You can't feel your body! You're still just a brain!</span>")
 		forceMove(C)
@@ -73,6 +90,12 @@
 
 	if((!QDELETED(src) || C) && !no_id_transfer)
 		transfer_identity(C)
+	// До transfer_identity() мозг должен оставаться рудиментарным для прежнего владельца.
+	if(!isnull(changeling_original_vital))
+		organ_flags = (organ_flags & ~ORGAN_VITAL) | changeling_original_vital
+		decoy_override = changeling_original_decoy
+		changeling_original_vital = null
+		changeling_original_decoy = null
 	if(C)
 		REMOVE_SKILL_MODIFIER_BODY(/datum/skill_modifier/brain_damage, null, C)
 		REMOVE_SKILL_MODIFIER_BODY(/datum/skill_modifier/heavy_brain_damage, null, C)
@@ -88,6 +111,9 @@
 		BT.on_gain()
 
 /obj/item/organ/brain/proc/transfer_identity(mob/living/L)
+	// organ/Destroy зовёт Remove(TRUE): без этого удаляемый мозг заводил себе новый brainmob
+	if(QDELETED(src))
+		return
 	name = "[L.name]'s brain"
 	if(brainmob)
 		return

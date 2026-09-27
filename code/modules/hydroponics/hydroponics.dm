@@ -27,7 +27,10 @@
 	var/rating = 1
 	var/unwrenchable = TRUE
 	var/recent_bee_visit = FALSE //Have we been visited by a bee recently, so bees dont overpollinate one plant
-	var/mob/lastuser //Last user to add reagents to a tray. Mostly for logging.
+	/// Слабая ссылка на последнего, кто подлил в лоток реагенты. Нужна только для
+	/// логов и on_hydroponics_apply; жёсткая держала тело весь раунд - лоток живёт
+	/// до конца смены, а обнуления у поля не было ни одного.
+	var/datum/weakref/lastuser_ref
 	var/self_sustaining = FALSE //If the tray generates nutrients and water on its own
 	// Here lies irrigation. You won't be missed, because you were never used.
 
@@ -146,7 +149,7 @@
 
 //Nutrients//////////////////////////////////////////////////////////////
 			// Nutrients deplete at a constant rate, since new nutrients can boost stats far easier.
-			apply_chemicals(lastuser)
+			apply_chemicals(lastuser_ref?.resolve())
 			if(self_sustaining)
 				reagents.remove_any(min(0.5, nutridrain))
 			else
@@ -321,6 +324,8 @@
 
 /obj/machinery/hydroponics/proc/update_icon_plant()
 	var/mutable_appearance/plant_overlay = mutable_appearance(myseed.growing_icon, layer = OBJ_LAYER + 0.01)
+	if(myseed.growing_icon_offset_y)
+		plant_overlay.pixel_y = myseed.growing_icon_offset_y
 	if(dead)
 		plant_overlay.icon_state = myseed.icon_dead
 	else if(harvest)
@@ -530,7 +535,7 @@
 				playsound(loc, 'sound/effects/slosh.ogg', 25, TRUE)
 				var/image/splash_animation = image('modular_splurt/icons/effects/effects.dmi', src, "splash_hydroponics")
 				splash_animation.color = mix_color_from_reagents(reagent_source.reagents.reagent_list)
-				flick_overlay(splash_animation, GLOB.clients, 1.1 SECONDS)
+				flick_overlay_view(splash_animation, 1.1 SECONDS)
 
 		if(visi_msg)
 			visible_message("<span class='notice'>[visi_msg].</span>")
@@ -546,7 +551,7 @@
 			reagent_source.reagents.trans_to(H.reagents, transfer_amount)
 			if(istype(reagent_source, /obj/item/reagent_containers/food/snacks) || istype(reagent_source, /obj/item/reagent_containers/pill))
 				qdel(reagent_source)
-				lastuser = user
+				lastuser_ref = WEAKREF(user)
 				H.update_icon()
 				return TRUE
 			H.update_icon()

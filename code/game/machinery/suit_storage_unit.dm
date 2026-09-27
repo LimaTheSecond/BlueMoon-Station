@@ -63,12 +63,13 @@
 	suit_type = /obj/item/clothing/suit/space/eva
 	helmet_type = /obj/item/clothing/head/helmet/space/eva
 	mask_type = /obj/item/clothing/mask/breath
+	mod_type = /obj/item/mod/control/pre_equipped
 
 /obj/machinery/suit_storage_unit/captain
 	suit_type = /obj/item/clothing/suit/space/hardsuit/captain
 	mask_type = /obj/item/clothing/mask/gas/atmos/captain
 	storage_type = /obj/item/tank/jetpack/oxygen/captain
-	//mod_type = /obj/item/mod/control/pre_equipped/magnate
+	mod_type = /obj/item/mod/control/pre_equipped/magnate
 
 /obj/machinery/suit_storage_unit/corporate
 	mask_type = /obj/item/clothing/mask/gas/atmos/captain/corporate
@@ -78,7 +79,7 @@
 	suit_type = /obj/item/clothing/suit/space/hardsuit/engine
 	mask_type = /obj/item/clothing/mask/gas/glass/alt
 	shoes_type = /obj/item/clothing/shoes/magboots
-	//mod_type = /obj/item/mod/control/pre_equipped/engineering
+	mod_type = /obj/item/mod/control/pre_equipped/engineering
 
 /obj/machinery/suit_storage_unit/industrial/ancient
 	suit_type = /obj/item/clothing/suit/space/hardsuit/ancient
@@ -94,30 +95,31 @@
 	suit_type = /obj/item/clothing/suit/space/hardsuit/engine/atmos
 	mask_type = /obj/item/clothing/mask/gas/atmos
 	storage_type = /obj/item/watertank/atmos
-	//mod_type = /obj/item/mod/control/pre_equipped/atmospheric
+	mod_type = /obj/item/mod/control/pre_equipped/atmospheric
 
 /obj/machinery/suit_storage_unit/industrial/ce
 	suit_type = /obj/item/clothing/suit/space/hardsuit/engine/elite
 	mask_type = /obj/item/clothing/mask/gas/glass/alt
 	shoes_type = /obj/item/clothing/shoes/magboots/advance
+	mod_type = /obj/item/mod/control/pre_equipped/advanced
 
 /obj/machinery/suit_storage_unit/atmos
 	suit_type = /obj/item/clothing/suit/space/hardsuit/engine/atmos
 	mask_type = /obj/item/clothing/mask/breath
 	storage_type = /obj/item/watertank/atmos
-	//mod_type = /obj/item/mod/control/pre_equipped/advanced
+	mod_type = /obj/item/mod/control/pre_equipped/advanced
 
 /obj/machinery/suit_storage_unit/security
 	suit_type = /obj/item/clothing/suit/space/hardsuit/security
 	mask_type = /obj/item/clothing/mask/gas/sechailer
 	storage_type = /obj/item/tank/jetpack/oxygen/security
-	//mod_type = /obj/item/mod/control/pre_equipped/security
+	mod_type = /obj/item/mod/control/pre_equipped/security
 
 /obj/machinery/suit_storage_unit/hos
 	suit_type = /obj/item/clothing/suit/space/hardsuit/security/hos
 	mask_type = /obj/item/clothing/mask/gas/sechailer
 	storage_type = /obj/item/tank/internals/oxygen
-	//mod_type = /obj/item/mod/control/pre_equipped/safeguard
+	mod_type = /obj/item/mod/control/pre_equipped/safeguard
 
 /obj/machinery/suit_storage_unit/atmos
 	suit_type = /obj/item/clothing/suit/space/hardsuit/engine/atmos
@@ -131,30 +133,30 @@
 /obj/machinery/suit_storage_unit/mining/eva
 	suit_type = /obj/item/clothing/suit/space/hardsuit/mining
 	mask_type = /obj/item/clothing/mask/breath
-	//mod_type = /obj/item/mod/control/pre_equipped/mining
+	mod_type = /obj/item/mod/control/pre_equipped/mining
 
 /obj/machinery/suit_storage_unit/cmo
 	suit_type = /obj/item/clothing/suit/space/hardsuit/medical
 	mask_type = /obj/item/clothing/mask/breath
-	//mod_type = /obj/item/mod/control/pre_equipped/rescue
+	mod_type = /obj/item/mod/control/pre_equipped/rescue
 
 /obj/machinery/suit_storage_unit/paramedic
 	name = "Paramedic Suit Storage Unit"
 	suit_type = /obj/item/clothing/suit/space/eva/paramedic
 	helmet_type = /obj/item/clothing/head/helmet/space/eva/paramedic
 	mask_type = /obj/item/clothing/mask/breath
-	//mod_type = /obj/item/mod/control/pre_equipped/medical
+	mod_type = /obj/item/mod/control/pre_equipped/medical
 
 /obj/machinery/suit_storage_unit/rd
 	suit_type = /obj/item/clothing/suit/space/hardsuit/rd
 	mask_type = /obj/item/clothing/mask/breath
-	//mod_type = /obj/item/mod/control/pre_equipped/research
+	mod_type = /obj/item/mod/control/pre_equipped/research
 
 /obj/machinery/suit_storage_unit/syndicate
 	suit_type = /obj/item/clothing/suit/space/hardsuit/syndi
 	mask_type = /obj/item/clothing/mask/gas/sechailer
 	storage_type = /obj/item/tank/jetpack/oxygen/harness
-	//mod_type = /obj/item/mod/control/pre_equipped/nuclear
+	mod_type = /obj/item/mod/control/pre_equipped/nuclear
 
 /obj/machinery/suit_storage_unit/winter_syndicate
 	suit_type = /obj/item/clothing/suit/space/hardsuit/syndi/elite/winter
@@ -163,6 +165,10 @@
 
 /obj/machinery/suit_storage_unit/syndicate/chameleon
 	suit_type = /obj/item/clothing/suit/space/hardsuit/syndi/elite
+
+/obj/machinery/suit_storage_unit/syndicate/command
+	suit_type = /obj/item/clothing/suit/space/hardsuit/syndi/elite
+	mod_type = /obj/item/mod/control/pre_equipped/elite
 
 //Bluemoon add start - добовляю сьют сторейдж для скафа киберсана
 
@@ -231,6 +237,11 @@
 		storage = new storage_type(src)
 	update_icon()
 
+/obj/machinery/suit_storage_unit/LateInitialize()
+	. = ..()
+	if(state_open)
+		take_mapload_contents()
+
 /obj/machinery/suit_storage_unit/Destroy()
 	QDEL_NULL(suit)
 	QDEL_NULL(helmet)
@@ -290,6 +301,48 @@
 	storage = null
 	occupant = null
 
+///При mapload забирает предметы с той же клетки, что и шкаф (как closet/take_contents).
+/obj/machinery/suit_storage_unit/proc/take_mapload_contents()
+	var/turf/T = get_turf(src)
+	if(!T)
+		return
+	for(var/atom/movable/AM in T)
+		if(AM == src || !isitem(AM))
+			continue
+		store_mapload_item(AM)
+	update_icon()
+
+///Кладёт предмет в первый подходящий свободный слот. TRUE — внутри, FALSE — не влез.
+/obj/machinery/suit_storage_unit/proc/store_mapload_item(obj/item/I)
+	if(istype(I, /obj/item/clothing/suit))
+		if(suit)
+			return FALSE
+		suit = I
+	else if(istype(I, /obj/item/clothing/head))
+		if(helmet)
+			return FALSE
+		helmet = I
+	else if(istype(I, /obj/item/clothing/mask))
+		if(mask)
+			return FALSE
+		mask = I
+	else if(istype(I, /obj/item/clothing/shoes))
+		if(shoes)
+			return FALSE
+		shoes = I
+	else if(istype(I, /obj/item/mod/control))
+		if(mod)
+			return FALSE
+		mod = I
+	else
+		if(storage)
+			return FALSE
+		storage = I
+	I.forceMove(src)
+	if(mod == I)
+		machine_wake()
+	return TRUE
+
 /obj/machinery/suit_storage_unit/deconstruct(disassembled = TRUE)
 	if(!(flags_1 & NODECONSTRUCT_1))
 		open_machine()
@@ -297,9 +350,20 @@
 		new /obj/item/stack/sheet/metal(loc, 2)
 	qdel(src)
 
+/obj/machinery/suit_storage_unit/proc/choice_type_of_suit(mob/living/user)
+	var/user_choice = tgui_input_list(user, "Выберите тип скафандра:", "МОД или Обычный скафандр", list("MODsuit", "Hardsuit"))
+	var/obj/item/suit_to_delete
+	if(user_choice == "MODsuit")
+		suit_to_delete = suit
+	else
+		suit_to_delete = mod
+	if(user_choice) //если пользователь хоть что-то выбрал, то можно удалять.
+		QDEL_NULL(suit_to_delete)
+
 /obj/machinery/suit_storage_unit/interact(mob/living/user)
 	var/static/list/items
-
+	if(suit && mod)
+		choice_type_of_suit(user)
 	if (!items)
 		items = list(
 			"suit" = create_silhouette_of(/obj/item/clothing/suit/space/eva),
@@ -325,9 +389,12 @@
 		choices["close"] = icon('icons/mob/radial.dmi', "radial_close")
 
 		for (var/item_key in items)
-			var/item = vars[item_key]
+			var/obj/item/item = vars[item_key]
 			if (item)
-				choices[item_key] = item
+				var/image/choice_icon = image(item)
+				choice_icon.pixel_x = item.base_pixel_x
+				choice_icon.pixel_y = item.base_pixel_y
+				choices[item_key] = choice_icon
 			else
 				// If the item doesn't exist, put a silhouette in its place
 				choices[item_key] = items[item_key]
@@ -364,6 +431,7 @@
 			else
 				if (occupant)
 					var/mob/living/mob_occupant = occupant
+					playsound(src, 'sound/machines/microwave/microwave-end.ogg', 50)
 					to_chat(mob_occupant, span_userdanger("[capitalize(src.name)] confines grow warm, then hot, then scorching. You're being burned [!mob_occupant.stat ? "alive" : "away"]!"))
 				cook()
 		if ("lock", "unlock")
@@ -465,18 +533,15 @@
 		if(uv_super)
 			visible_message("<span class='warning'>[src]'s door creaks open with a loud whining noise. A cloud of foul black smoke escapes from its chamber.</span>")
 			playsound(src, 'sound/machines/airlock_alien_prying.ogg', 50, 1)
-			helmet = null
-			qdel(helmet)
-			suit = null
-			qdel(suit) // Delete everything but the occupant.
-			mask = null
-			qdel(mask)
-			shoes = null
-			qdel(shoes)
-			mod = null
-			qdel(mod)
-			storage = null
-			qdel(storage)
+			// Раньше стояло `helmet = null; qdel(helmet)` - qdel(null) не удаляет ничего:
+			// сожжённое содержимое оставалось жить в contents шкафа без ссылок из его
+			// переменных, а ядерный МОД из /nuclear уходил в харддел.
+			QDEL_NULL(helmet)
+			QDEL_NULL(suit) // Delete everything but the occupant.
+			QDEL_NULL(mask)
+			QDEL_NULL(shoes)
+			QDEL_NULL(mod)
+			QDEL_NULL(storage)
 			// The wires get damaged too.
 			wires.cut_all()
 		else
@@ -526,9 +591,9 @@
 	if(mod)
 		if(!istype(mod))
 			return machine_sleep()
-		if(!mod.cell)
+		cell = mod.get_cell()
+		if(!cell)
 			return machine_sleep()
-		cell = mod.cell
 	else
 		return machine_sleep()
 
@@ -581,6 +646,21 @@
 	else
 		open_machine()
 		dump_contents()
+
+/obj/machinery/suit_storage_unit/Exited(atom/movable/gone, atom/newloc)
+	. = ..()
+	if(gone == suit)
+		suit = null
+	else if(gone == helmet)
+		helmet = null
+	else if(gone == mask)
+		mask = null
+	else if(gone == shoes)
+		shoes = null
+	else if(gone == mod)
+		mod = null
+	else if(gone == storage)
+		storage = null
 
 /obj/machinery/suit_storage_unit/proc/resist_open(mob/user)
 	if(!state_open && occupant && (user in src) && user.stat == CONSCIOUS) // Check they're still here.

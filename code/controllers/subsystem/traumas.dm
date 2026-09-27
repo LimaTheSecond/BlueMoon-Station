@@ -138,6 +138,8 @@ SUBSYSTEM_DEF(traumas)
 						/obj/item/clothing/suit/armor/abductor, /obj/item/abductor, /obj/item/gun/energy/alien,
 						/obj/item/abductor/baton, /obj/item/radio/headset/abductor, /obj/item/scalpel/alien, /obj/item/hemostat/alien,
 						/obj/item/retractor/alien, /obj/item/circular_saw/alien, /obj/item/surgicaldrill/alien, /obj/item/cautery/alien,
+						/obj/item/scalpel/advanced/alien, /obj/item/retractor/advanced/alien, /obj/item/surgicaldrill/advanced/alien,
+						/obj/item/scalpel/advanced/alien/cyborg, /obj/item/retractor/advanced/alien/cyborg, /obj/item/surgicaldrill/advanced/alien/cyborg,
 						/obj/item/clothing/head/helmet/abductor, /obj/structure/bed/abductor, /obj/structure/table_frame/abductor,
 						/obj/structure/table/abductor, /obj/structure/table/optable/abductor, /obj/structure/closet/abductor, /obj/item/organ/heart/gland,
 						/obj/machinery/abductor, /obj/item/crowbar/abductor, /obj/item/screwdriver/abductor, /obj/item/weldingtool/abductor,
@@ -204,5 +206,25 @@ SUBSYSTEM_DEF(traumas)
 						 )
 
 	return ..()
+
+/// Проверка сохранённого в префах типа фобии. Возвращает выбор как есть, если он валиден,
+/// и null, если такого типа больше нет в пуле.
+/// Клиент может подключиться и загрузить персонажа задолго до того, как подсистема
+/// поднимется (Master.Initialize идёт с waitfor = 0), поэтому пустой список типов означает
+/// "проверить нечем", а не "выбор невалиден" - иначе санитайзер стирает живую настройку.
+/datum/controller/subsystem/traumas/proc/sanitize_phobia_type(phobia_type)
+	if(!phobia_type || !length(phobia_types))
+		return phobia_type
+	if(phobia_type in phobia_types)
+		return phobia_type
+	return null
+
+/// Тип фобии для выдачи: выбор игрока, если он валиден, иначе случайный из пула.
+/datum/controller/subsystem/traumas/proc/pick_phobia_type(preferred)
+	if(!length(phobia_types))
+		return preferred
+	if(preferred && (preferred in phobia_types))
+		return preferred
+	return pick(phobia_types)
 
 #undef PHOBIA_FILE

@@ -19,7 +19,7 @@
 	/// If this attacks a human with no wound armor on the affected body part, add this to the wound mod. Some attacks may be significantly worse at wounding if there's even a slight layer of armor to absorb some of it vs bare flesh
 	var/bare_wound_bonus = 0
 
-	var/datum/armor/armor
+	// var/datum/armor/armor
 	var/obj_integrity	//defaults to max_integrity
 	var/max_integrity = 500
 	var/integrity_failure = 0 //0 if we have no special broken behavior, otherwise is a percentage of at what point the obj breaks. 0.5 being 50%
@@ -71,7 +71,9 @@
 
 /obj/Initialize(mapload)
 	if (islist(armor))
-		armor = getArmor(arglist(armor))
+		var/datum/armor/blank_armor = new()
+		armor = blank_armor.generate_new_with_specific(armor)
+		qdel(blank_armor)
 	else if (!armor)
 		armor = getArmor()
 	else if (!istype(armor, /datum/armor))
@@ -327,7 +329,11 @@
 		step_towards(src,S)
 
 /obj/get_dumping_location(datum/component/storage/source,mob/user)
-	return get_turf(src)
+	//хранилище приезжает не только типом /obj/item/storage, но и компонентом (МОД
+	//с модулем отсеков). storage_contents_dump_act() ниже по стеку уже смотрит на
+	//компонент, а не на тип, так что без этой проверки высыпаемая сумка уезжала
+	//на пол мимо вполне себе годного контейнера.
+	return GetComponent(/datum/component/storage) ? src : get_turf(src)
 
 /**
  * This proc is used for telling whether something can pass by this object in a given direction, for use by the pathfinding system.

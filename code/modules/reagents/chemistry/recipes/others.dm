@@ -10,12 +10,12 @@
 	required_reagents = list(/datum/reagent/metalgen = 1, /datum/reagent/liquid_dark_matter = 1)
 	results = list(/datum/reagent/metalgen = 1)
 
-/datum/chemical_reaction/holywater
+/* /datum/chemical_reaction/holywater
 	name = "Holy Water"
 	id = /datum/reagent/water/holywater
 	results = list(/datum/reagent/water/holywater = 1)
 	required_reagents = list(/datum/reagent/water/hollowwater = 1)
-	required_catalysts = list(/datum/reagent/water/holywater = 1)
+	required_catalysts = list(/datum/reagent/water/holywater = 1) */
 
 /datum/chemical_reaction/metalgen_imprint/on_reaction(datum/reagents/holder, created_volume)
 	var/datum/reagent/metalgen/MM = holder.get_reagent(/datum/reagent/metalgen)
@@ -304,6 +304,17 @@
 	required_reagents = list(/datum/reagent/toxin/mutagen = 1)
 	level_min = 2
 	level_max = 4
+
+/datum/chemical_reaction/mix_virus/mix_virus_2/on_reaction(datum/reagents/holder, multiplier)
+	var/datum/reagent/blood/B = locate(/datum/reagent/blood) in holder.reagent_list
+	if(!B || !islist(B.data))
+		return
+	var/datum/disease/advance/D = locate(/datum/disease/advance) in B.data["viruses"]
+	if(D)
+		for(var/i in 1 to min(multiplier, 5))
+			D.Evolve(level_min, level_max)
+		return
+	holder.add_reagent(B.type, multiplier, null, holder.chem_temp)
 
 /datum/chemical_reaction/mix_virus/mix_virus_2/synth
 	id = "mixvirus2_synth"

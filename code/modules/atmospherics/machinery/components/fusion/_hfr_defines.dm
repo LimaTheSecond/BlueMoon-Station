@@ -59,6 +59,10 @@
 #define HFR_COOLING_PER_TICK_FACTOR 0.01
 /// Evaporate moderator: (1 - (1 - this * power_level)^seconds_per_tick) fraction removed per tick
 #define HFR_EVAPORATE_RATE_BASE 0.0005
+/// Iron accumulates above this power level and decays at or below it
+#define HFR_IRON_GROWTH_POWER_LEVEL 4
+/// round() floors in DM, so (round(iron_content) - 1) only bites once iron reaches this
+#define HFR_IRON_DAMAGE_THRESHOLD 2
 /// Iron content damage: (round(iron_content)-1) * this * seconds_per_tick per point above 1
 #define HFR_IRON_DAMAGE_PER_POINT 2.5
 /// Healium heal: only when critical_threshold_proximity > this
@@ -97,6 +101,39 @@
 #define HFR_FALLBACK_IRON_RATE 0.10
 /// Volume = internal_fusion.return_volume() * (magnetic_constrictor * this)
 #define HFR_MAGNETIC_VOLUME_FRAC 0.01
+
+/// Tuning limits. ui_act() clamps to these and ui_static_data() ships them to the
+/// interface, so the sliders cannot offer a value the machine would silently refuse.
+#define HFR_LIMIT_HEATING_CONDUCTOR_MIN 50
+#define HFR_LIMIT_HEATING_CONDUCTOR_MAX 500
+#define HFR_LIMIT_MAGNETIC_CONSTRICTOR_MIN 50
+#define HFR_LIMIT_MAGNETIC_CONSTRICTOR_MAX 1000
+#define HFR_LIMIT_FUEL_INJECTION_MIN 5
+#define HFR_LIMIT_FUEL_INJECTION_MAX 1500
+#define HFR_LIMIT_MODERATOR_INJECTION_MIN 5
+#define HFR_LIMIT_MODERATOR_INJECTION_MAX 1500
+#define HFR_LIMIT_CURRENT_DAMPER_MIN 0
+#define HFR_LIMIT_CURRENT_DAMPER_MAX 1000
+#define HFR_LIMIT_FILTERING_RATE_MIN 5
+#define HFR_LIMIT_FILTERING_RATE_MAX 200
+#define HFR_LIMIT_COOLING_VOLUME_MIN 50
+#define HFR_LIMIT_COOLING_VOLUME_MAX 2000
+/// Cooling volume is a machine part, not a dial: coarse steps keep the slider usable.
+#define HFR_LIMIT_COOLING_VOLUME_STEP 25
+
+/// Fusion gas temperature at which each power level starts (update_temperature_status).
+/// Level 0 is everything below the first entry, level 6 everything above the last.
+#define HFR_POWER_LEVEL_1_TEMPERATURE 500
+#define HFR_POWER_LEVEL_2_TEMPERATURE 1e3
+#define HFR_POWER_LEVEL_3_TEMPERATURE 1e4
+#define HFR_POWER_LEVEL_4_TEMPERATURE 1e5
+#define HFR_POWER_LEVEL_5_TEMPERATURE 1e6
+#define HFR_POWER_LEVEL_6_TEMPERATURE 1e7
+
+/// Интерфейс шлёт ui_act на каждый шаг перетаскивания слайдера, поэтому строчку в лог
+/// пишем не чаще раза в это окно (на каждое действие отдельно), а last_touched_* на
+/// ядре обновляем всегда - иначе к моменту аварии не осталось бы ничьей фамилии.
+#define HFR_SETTING_LOG_COOLDOWN 5 SECONDS
 
 ///Mole count required (tritium/hydrogen) to start a fusion reaction in HFR (reactions.dm uses 250 for other fusion)
 #define HFR_FUSION_MOLE_THRESHOLD 25
@@ -247,16 +284,16 @@
 /datum/sound_effect/hypertorus_calm
 	key = SFX_HYPERTORUS_CALM
 	file_paths = list(
-		'sound/machines/hypertorus/accent/calm/1.ogg',
-		'sound/machines/hypertorus/accent/calm/2.ogg',
-		'sound/machines/hypertorus/accent/calm/3.ogg',
+		'sound/machines/sm/accent/normal/1.ogg',
+		'sound/machines/sm/accent/normal/2.ogg',
+		'sound/machines/sm/accent/normal/3.ogg',
 	)
 
 /datum/sound_effect/hypertorus_melting
 	key = SFX_HYPERTORUS_MELTING
 	file_paths = list(
-		'sound/machines/hypertorus/accent/melting/1.ogg',
-		'sound/machines/hypertorus/accent/melting/2.ogg',
-		'sound/machines/hypertorus/accent/melting/3.ogg',
-		'sound/machines/hypertorus/accent/melting/4.ogg',
+		'sound/machines/sm/accent/delam/1.ogg',
+		'sound/machines/sm/accent/delam/2.ogg',
+		'sound/machines/warning-buzzer.ogg',
+		'sound/machines/engine_alert1.ogg',
 	)

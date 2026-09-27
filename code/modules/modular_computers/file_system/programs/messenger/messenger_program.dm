@@ -8,7 +8,7 @@
 	if(!length(GLOB.cached_emoji_list))
 		GLOB.cached_emoji_list = list()
 		GLOB.cached_emoji_base64 = list()
-		var/datum/asset/spritesheet/sheet = get_asset_datum(/datum/asset/spritesheet/chat)
+		var/datum/asset/spritesheet_batched/chat/sheet = get_asset_datum(/datum/asset/spritesheet_batched/chat)
 		for(var/sprite_name in sheet.sprites)
 			if(findtextEx(sprite_name, "emoji-") == 1)
 				var/emoji_name = copytext(sprite_name, 7)
@@ -139,23 +139,11 @@
 /datum/computer_file/program/messenger/proc/get_messengers()
 	var/list/dictionary = list()
 	var/list/unsorted = list()
-
-	for(var/obj/item/modular_computer/pda/pda_device in GLOB.PDAs)
-		if(pda_device == computer)
+	var/own_ref = REF(src)
+	for(var/list/entry as anything in get_messenger_directory())
+		if(entry["ref"] == own_ref)
 			continue
-		if(pda_device.toff || pda_device.hidden)
-			continue
-		if(!pda_device.saved_identification && !pda_device.saved_job)
-			continue
-		var/datum/computer_file/program/messenger/messenger = locate(/datum/computer_file/program/messenger) in pda_device.get_all_files()
-		if(!istype(messenger) || messenger.invisible)
-			continue
-
-		var/list/data = list()
-		data["name"] = pda_device.saved_identification || "Unknown"
-		data["job"] = pda_device.saved_job || "Unknown"
-		data["ref"] = REF(messenger)
-		unsorted += list(data)
+		unsorted += list(entry)
 
 	if(sort_by_job)
 		sortTim(unsorted, /proc/cmp_list_data_job)
@@ -166,6 +154,32 @@
 		dictionary[entry["ref"]] = entry
 
 	return dictionary
+
+GLOBAL_LIST_EMPTY(pda_messenger_directory)
+GLOBAL_VAR_INIT(pda_messenger_directory_time, -1)
+
+/// Список видимых мессенджеров общий для всех открытых окон: SStgui опрашивает каждое
+/// раз в секунду, и обход всех ПДА с get_all_files() на каждое окно не нужен.
+/proc/get_messenger_directory()
+	if(GLOB.pda_messenger_directory_time == world.time)
+		return GLOB.pda_messenger_directory
+	var/list/directory = list()
+	for(var/obj/item/modular_computer/pda/pda_device in GLOB.PDAs)
+		if(pda_device.toff || pda_device.hidden)
+			continue
+		if(!pda_device.saved_identification && !pda_device.saved_job)
+			continue
+		var/datum/computer_file/program/messenger/messenger = locate(/datum/computer_file/program/messenger) in pda_device.get_all_files()
+		if(!istype(messenger) || messenger.invisible)
+			continue
+		var/list/data = list()
+		data["name"] = pda_device.saved_identification || "Unknown"
+		data["job"] = pda_device.saved_job || "Unknown"
+		data["ref"] = REF(messenger)
+		directory += list(data)
+	GLOB.pda_messenger_directory = directory
+	GLOB.pda_messenger_directory_time = world.time
+	return directory
 
 /// Checks if the person can send an everyone message
 /datum/computer_file/program/messenger/proc/can_send_everyone_message()
@@ -367,7 +381,7 @@
 			return TRUE
 
 		if("PDA_setAdminPhoto")
-			if(!usr.client?.holder && !is_donator_group(usr.ckey, DONATOR_GROUP_TIER_2))
+			if(!usr.client?.holder && !is_donator_group(usr.ckey, DONATOR_GROUP_TIER_1))
 				to_chat(usr, span_warning("Only administrators and sponsors can use this feature."))
 				return FALSE
 			var/url = params["url"]
@@ -387,12 +401,26 @@
 				usr << link(url)
 			return TRUE
 
+		if("PDA_sendMoney")
+			var/mob/living/user = usr
+			if(!istype(user))
+				return FALSE
+			var/target_ref = params["ref"]
+			var/amount = round(text2num(params["amount"]))
+			var/currency = params["currency"]
+			if(currency != "metadollars")
+				currency = "credits"
+			return transfer_money_to_chat(user, target_ref, amount, currency)
+
 /datum/computer_file/program/messenger/ui_static_data(mob/user)
 	var/list/static_data = list()
 	static_data["can_spam"] = spam_mode
 	static_data["is_silicon"] = issilicon(user)
 	static_data["remote_silicon"] = FALSE
 	static_data["alert_able"] = alert_able
+	static_data["ringtone_list"] = GLOB.pda_ringtone_list
+	static_data["emoji_list"] = get_emoji_list()
+	static_data["emoji_base64"] = get_emoji_base64()
 	return static_data
 
 /datum/computer_file/program/messenger/ui_data(mob/user)
@@ -421,22 +449,15 @@
 	data["stored_photos"] = list()
 	data["selected_photo_path"] = null
 	data["on_spam_cooldown"] = !can_send_everyone_message()
-	data["ringtone_list"] = GLOB.pda_ringtone_list
 	data["current_ringtone"] = ringtone
-	data["emoji_list"] = get_emoji_list()
-	data["emoji_base64"] = get_emoji_base64()
 
 	var/obj/item/modular_computer/pda/pda_device = computer
 	if(istype(pda_device) && pda_device.picture)
 		data["has_scanned_photo"] = TRUE
 		var/datum/picture/pic = pda_device.picture
-		if(pic && pic.picture_image)
-			var/icon/img = pic.picture_image
-			var/base64 = icon2base64(img)
-			if(base64)
-				data["selected_photo_path"] = "data:image/png;base64,[base64]"
-			else
-				data["selected_photo_path"] = null
+		var/base64 = pic?.get_base64()
+		if(base64)
+			data["selected_photo_path"] = "data:image/png;base64,[base64]"
 		else
 			data["selected_photo_path"] = null
 	else
@@ -450,6 +471,14 @@
 	if(istype(disk, /obj/item/cartridge/virus))
 		data["virus_attach"] = TRUE
 		data["sending_virus"] = sending_virus
+
+	// BLUEMOON ADD: балансы для переводов в чате
+	var/credits_balance = 0
+	var/obj/item/modular_computer/sender_comp = computer
+	if(istype(sender_comp) && sender_comp.stored_id?.registered_account)
+		credits_balance = sender_comp.stored_id.registered_account.account_balance
+	data["credits_balance"] = credits_balance
+	data["metadollar_balance"] = user?.client?.ckey ? SSmetadollars.get_metadollars(user.client.ckey) : 0
 	return data
 
 /datum/computer_file/program/messenger/ui_assets(mob/user)
@@ -503,6 +532,196 @@
 	if(send_message(user, message, chats, everyone = TRUE))
 		COOLDOWN_START(src, last_text_everyone, 2 MINUTES)
 
+	if(send_message(user, message, chats, everyone = TRUE))
+		COOLDOWN_START(src, last_text_everyone, 2 MINUTES)
+
+// BLUEMOON ADD: перевод денег собеседнику из чата
+/datum/computer_file/program/messenger/proc/transfer_money_to_chat(mob/living/user, target_ref, amount, currency = "credits")
+	if(!istype(user) || isobserver(user))
+		return FALSE
+	if(!amount || !isnum(amount) || amount <= 0)
+		to_chat(user, span_warning("Укажите сумму больше нуля."))
+		return FALSE
+	amount = round(amount)
+	if(amount > 1000000)
+		to_chat(user, span_warning("Сумма слишком большая (максимум 1 000 000)."))
+		return FALSE
+	if(!user.canUseTopic(computer, BE_CLOSE, check_resting = FALSE))
+		return FALSE
+
+
+	var/datum/pda_chat/target_chat = null
+	var/datum/computer_file/program/messenger/target_messenger = null
+	if(target_ref in saved_chats)
+		target_chat = saved_chats[target_ref]
+		target_messenger = target_chat.recipient?.resolve()
+	else if(target_ref in GLOB.pda_messengers)
+		target_messenger = GLOB.pda_messengers[target_ref]
+		target_chat = find_chat_by_recipient(target_ref)
+		if(!istype(target_chat))
+			target_chat = create_chat(target_ref)
+	else
+		for(var/obj/item/modular_computer/pda/pda_device in GLOB.PDAs)
+			var/datum/computer_file/program/messenger/messenger = locate(/datum/computer_file/program/messenger) in pda_device.get_all_files()
+			if(istype(messenger) && REF(messenger) == target_ref)
+				target_messenger = messenger
+				add_messenger(messenger)
+				break
+		if(istype(target_messenger))
+			target_chat = find_chat_by_recipient(REF(target_messenger))
+			if(!istype(target_chat))
+				target_chat = create_chat(REF(target_messenger))
+
+	if(!istype(target_messenger) || !istype(target_messenger.computer))
+		to_chat(user, span_warning("ERROR: Получатель не найден."))
+		return FALSE
+	if(target_messenger == src)
+		to_chat(user, span_warning("Нельзя перевести деньги самому себе."))
+		return FALSE
+	if(!istype(target_chat))
+		to_chat(user, span_warning("ERROR: Чат не найден."))
+		return FALSE
+	if(!target_chat.can_reply)
+		to_chat(user, span_warning("ERROR: Получатель недоступен."))
+		return FALSE
+
+	var/sender_name = computer.saved_identification || user.real_name || "Unknown"
+	var/recipient_name = target_messenger.computer.saved_identification || "Unknown"
+
+	if(currency == "metadollars")
+		return transfer_metadollars_to_chat(user, target_messenger, target_chat, amount, sender_name, recipient_name)
+	return transfer_credits_to_chat(user, target_messenger, target_chat, amount, sender_name, recipient_name)
+
+/datum/computer_file/program/messenger/proc/transfer_credits_to_chat(mob/living/user, datum/computer_file/program/messenger/target_messenger, datum/pda_chat/target_chat, amount, sender_name, recipient_name)
+	var/obj/item/modular_computer/sender_comp = computer
+	if(!istype(sender_comp) || !sender_comp.stored_id)
+		to_chat(user, span_warning("Карта не вставлена в PDA. Вставьте ID-карту для перевода."))
+		return FALSE
+	var/datum/bank_account/sender_acc = sender_comp.stored_id.registered_account
+	if(!sender_acc)
+		to_chat(user, span_warning("На вставленной ID-карте нет банковского счёта."))
+		return FALSE
+	var/datum/bank_account/recipient_acc = null
+	var/obj/item/modular_computer/pda/recip_pda = target_messenger.computer
+	if(istype(recip_pda) && recip_pda.stored_id?.registered_account)
+		recipient_acc = recip_pda.stored_id.registered_account
+	if(!recipient_acc)
+		// Fallback: счёт ID у моба-держателя PDA получателя
+		var/obj/item/modular_computer/recip_comp = target_messenger.computer
+		var/mob/living/holder = null
+		if(isliving(recip_comp.loc))
+			holder = recip_comp.loc
+		else if(isliving(recip_comp.loc?.loc))
+			holder = recip_comp.loc.loc
+		if(istype(holder))
+			recipient_acc = holder.get_bank_account()
+	if(!recipient_acc)
+		to_chat(user, span_warning("У получателя нет банковского счёта."))
+		return FALSE
+	if(sender_acc == recipient_acc)
+		to_chat(user, span_warning("Нельзя перевести деньги самому себе."))
+		return FALSE
+	if(!sender_acc.has_money(amount))
+		to_chat(user, span_warning("Недостаточно кредитов. Баланс: [sender_acc.account_balance] кр."))
+		return FALSE
+	// dest.transfer_money(from, amount)
+	if(!recipient_acc.transfer_money(sender_acc, amount))
+		to_chat(user, span_warning("Перевод не удался. Проверьте счёт получателя."))
+		return FALSE
+
+	log_econ("[sender_name] ([sender_acc.account_holder]) перевёл [amount] кр. получателю [recipient_name] ([recipient_acc.account_holder]) через PDA Messenger.")
+	sender_acc.bank_card_talk("Перевод [amount] кр. → [recipient_acc.account_holder]. Баланс: [sender_acc.account_balance] кр.", TRUE)
+	recipient_acc.bank_card_talk("Получен перевод [amount] кр. от [sender_acc.account_holder]. Баланс: [recipient_acc.account_balance] кр.", TRUE)
+
+	var/time_now = STATION_TIME_TIMESTAMP(PDA_MESSAGE_TIMESTAMP_FORMAT, world.time)
+	var/datum/pda_message/out_msg = new("💵 Перевод: [amount] сr. → [recipient_name]. Баланс: [sender_acc.account_balance] сr.", TRUE, time_now, null, FALSE)
+	target_chat.add_message(out_msg, show_in_recents = TRUE)
+	target_chat.unread_messages = 0
+
+	// Сообщение в чате получателя
+	var/datum/pda_chat/recip_chat = target_messenger.find_chat_by_recipient(REF(src))
+	if(!istype(recip_chat))
+		recip_chat = target_messenger.create_chat(REF(src))
+	if(istype(recip_chat))
+		var/datum/pda_message/in_msg = new("💵 Получен перевод: [amount] сr. от [sender_name]. Баланс: [recipient_acc.account_balance] сr.", FALSE, time_now, null, FALSE)
+		recip_chat.add_message(in_msg)
+		recip_chat.unread_messages++
+
+	to_chat(user, span_notice("Перевод [amount] сr. отправлен: [recipient_name]."))
+	SStgui.update_uis(computer)
+	if(target_messenger.computer)
+		SStgui.update_uis(target_messenger.computer)
+	return TRUE
+
+/datum/computer_file/program/messenger/proc/transfer_metadollars_to_chat(mob/living/user, datum/computer_file/program/messenger/target_messenger, datum/pda_chat/target_chat, amount, sender_name, recipient_name)
+	var/sender_ckey = user.client?.ckey
+	if(!sender_ckey)
+		return FALSE
+	if(!SSmetadollars)
+		to_chat(user, span_warning("Система метадолларов недоступна."))
+		return FALSE
+	var/sender_balance = SSmetadollars.get_metadollars(sender_ckey)
+	if(sender_balance < amount)
+		to_chat(user, span_warning("Недостаточно метадолларов. Баланс: [sender_balance] M$."))
+		return FALSE
+	var/recipient_ckey = get_messenger_ckey(target_messenger)
+	if(!recipient_ckey)
+		to_chat(user, span_warning("Получатель не в сети, перевод M$ невозможен."))
+		return FALSE
+	if(recipient_ckey == sender_ckey)
+		to_chat(user, span_warning("Нельзя перевести деньги самому себе."))
+		return FALSE
+	SSmetadollars.metadollar_adjust(-amount, sender_ckey, user.client?.key)
+	var/client/recip_client = GLOB.directory[recipient_ckey]
+	SSmetadollars.metadollar_adjust(amount, recipient_ckey, recip_client?.key)
+
+	log_admin("METADOLLAR: [sender_name] ([sender_ckey]) перевёл [amount] M$ получателю [recipient_name] ([recipient_ckey]) через PDA Messenger.")
+
+	var/sender_new_balance = SSmetadollars.get_metadollars(sender_ckey)
+	var/recipient_new_balance = SSmetadollars.get_metadollars(recipient_ckey)
+
+	var/time_now = STATION_TIME_TIMESTAMP(PDA_MESSAGE_TIMESTAMP_FORMAT, world.time)
+	var/datum/pda_message/out_msg = new("💵 Перевод: [amount] M$ → [recipient_name]. Баланс: [sender_new_balance] M$.", TRUE, time_now, null, FALSE)
+	target_chat.add_message(out_msg, show_in_recents = TRUE)
+	target_chat.unread_messages = 0
+
+	var/datum/pda_chat/recip_chat = target_messenger.find_chat_by_recipient(REF(src))
+	if(!istype(recip_chat))
+		recip_chat = target_messenger.create_chat(REF(src))
+	if(istype(recip_chat))
+		var/datum/pda_message/in_msg = new("💵 Получен перевод: [amount] M$ от [sender_name]. Баланс: [recipient_new_balance] M$.", FALSE, time_now, null, FALSE)
+		recip_chat.add_message(in_msg)
+		recip_chat.unread_messages++
+
+	to_chat(user, span_notice("Перевод [amount] M$ отправлен: [recipient_name]."))
+	if(recip_client?.mob)
+		to_chat(recip_client.mob, span_notice("Получен перевод [amount] M$ от [sender_name] через PDA Messenger."))
+	SStgui.update_uis(computer)
+	if(target_messenger.computer)
+		SStgui.update_uis(target_messenger.computer)
+	return TRUE
+
+
+/datum/computer_file/program/messenger/proc/get_messenger_ckey(datum/computer_file/program/messenger/target_messenger)
+	if(!istype(target_messenger) || !istype(target_messenger.computer))
+		return null
+	var/obj/item/modular_computer/comp = target_messenger.computer
+	if(isliving(comp.loc))
+		var/mob/living/holder = comp.loc
+		if(holder.client?.ckey)
+			return holder.client.ckey
+	if(isliving(comp.loc?.loc))
+		var/mob/living/outer = comp.loc.loc
+		if(outer.client?.ckey)
+			return outer.client.ckey
+	var/target_name = comp.saved_identification
+	if(target_name)
+		for(var/ck in GLOB.directory)
+			var/client/checking = GLOB.directory[ck]
+			if(istype(checking?.mob) && checking.mob.real_name == target_name)
+				return checking.ckey
+	return null
+
 /// Creates a chat and adds it to saved_chats. Returns the new chat.
 /datum/computer_file/program/messenger/proc/create_chat(recipient_ref, name, job)
 	var/datum/computer_file/program/messenger/recipient = null
@@ -553,12 +772,10 @@
 	var/obj/item/modular_computer/pda/pda_device = computer
 	if(istype(pda_device) && pda_device.picture)
 		var/datum/picture/pic = pda_device.picture
-		if(pic && pic.picture_image)
-			var/icon/img = pic.picture_image
-			var/base64 = icon2base64(img)
-			if(base64)
-				photo_path = "data:image/png;base64,[base64]"
-				photo_asset = photo_path
+		var/base64 = pic?.get_base64()
+		if(base64)
+			photo_path = "data:image/png;base64,[base64]"
+			photo_asset = photo_path
 			pda_device.picture = null
 
 	if(admin_photo_url)
@@ -568,6 +785,8 @@
 
 	message = sanitize_pda_message(message, sender)
 	if(!message && !photo_path)
+		if(mime_mode && sender)
+			to_chat(sender, span_notice("PDA мима отправляет только эмодзи и фотографии. Выберите эмодзи кнопкой в чате или прикрепите фото; обычный текст удаляется."))
 		return FALSE
 
 	// Filter targets

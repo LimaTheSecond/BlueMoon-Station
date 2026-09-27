@@ -12,8 +12,25 @@
 	material_drop = /obj/item/stack/sheet/cloth
 	delivery_icon = null //unwrappable
 	anchorable = FALSE
+	// В bodybag.dmi нет ни одного стейта _door/_back/welded: у мешка нет двери,
+	// его состояние целиком живёт в icon_state.
+	has_door_icon = FALSE
+	door_anim_time = 0
 	var/foldedbag_path = /obj/item/bodybag
 	var/tagged = 0 // so closet code knows to put the tag overlay back
+	var/obj/item/attached_note
+
+/// Суффикс базового стейта для закрытого мешка (у транспортного - застёгнутость).
+/obj/structure/closet/body_bag/proc/bag_icon_suffix()
+	return ""
+
+/obj/structure/closet/body_bag/update_icon_state()
+	. = ..()
+	// Стейт "_open" в bodybag.dmi - это ТОЛЬКО расстёгнутый зев, без корпуса мешка:
+	// он кладётся оверлеем поверх закрытого мешка штатной схемой шкафа. Если подставить
+	// его прямо в icon_state, на полу остаётся одна чёрная клякса без мешка вокруг,
+	// поэтому базовый стейт всегда закрытый мешок, а открытость показывает оверлей.
+	icon_state = "[initial(icon_state)][bag_icon_suffix()]"
 
 /obj/structure/closet/body_bag/attackby(obj/item/I, mob/user, params)
 	if (istype(I, /obj/item/pen) || istype(I, /obj/item/toy/crayon))
@@ -33,15 +50,103 @@
 			name = "body bag"
 		return
 	else if(I.tool_behaviour == TOOL_WIRECUTTER)
+		if(attached_note)
+			remove_attached_note(user)
+			return
+		if(!tagged)
+			to_chat(user, span_notice("На [src] нет ни бирки, ни листка."))
+			return
 		to_chat(user, span_notice("Вы отрезали бирку у [src]."))
 		name = "body bag"
 		tagged = 0
 		update_icon()
+		return
+	else if(istype(I, /obj/item/paper) || istype(I, /obj/item/photo))
+		if(attached_note)
+			to_chat(user, span_warning("К [src] уже прикреплён [attached_note]! Снимите его перед тем, как крепить новый."))
+			return
+		if(!user.transferItemToLoc(I, src))
+			to_chat(user, span_warning("Вы не можете прикрепить [I] к [src]!"))
+			return
+		set_attached_note(I)
+		user.visible_message(span_notice("[user] прикрепляет [I] к [src]."), span_notice("Вы прикрепляете [I] к [src]."))
+		playsound(src, 'sound/items/poster_ripped.ogg', 30, TRUE)
+		return
+
+/obj/structure/closet/body_bag/proc/set_attached_note(obj/item/new_note)
+	if(attached_note == new_note)
+		return
+	if(attached_note)
+		UnregisterSignal(attached_note, COMSIG_PARENT_QDELETING)
+	attached_note = new_note
+	if(attached_note)
+		RegisterSignal(attached_note, COMSIG_PARENT_QDELETING, PROC_REF(on_attached_note_deleted))
+	update_icon()
+
+/obj/structure/closet/body_bag/proc/on_attached_note_deleted(datum/source)
+	SIGNAL_HANDLER
+	attached_note = null
+	update_icon()
+
+/obj/structure/closet/body_bag/proc/remove_attached_note(mob/user)
+	if(!attached_note)
+		return null
+	var/obj/item/torn_note = attached_note
+	set_attached_note(null)
+	torn_note.forceMove(drop_location())
+	if(user && ishuman(user))
+		user.put_in_hands(torn_note)
+	if(user)
+		user.visible_message(span_notice("[user] снимает [torn_note] с [src]."), span_notice("Вы снимаете [torn_note] с [src]."))
+		playsound(src, 'sound/items/poster_ripped.ogg', 30, TRUE)
+	else
+		playsound(src, 'sound/items/poster_ripped.ogg', 30, TRUE)
+	update_icon()
+	return torn_note
+
+/obj/structure/closet/body_bag/examine(mob/user)
+	. = ..()
+	if(attached_note)
+		if(!in_range(user, src))
+			. += span_notice("К [src] прикреплён [attached_note.name], но отсюда его не прочитать.")
+		else
+			. += span_notice("К [src] прикреплён [attached_note.name]:")
+			. += attached_note.examine(user)
+
+/obj/structure/closet/body_bag/on_attack_hand(mob/user, act_intent = user.a_intent, unarmed_attack_flags)
+	if(attached_note && user.a_intent == INTENT_GRAB)
+		add_fingerprint(user)
+		remove_attached_note(user)
+		return
+	return ..()
+
+/obj/structure/closet/body_bag/dump_contents(override = TRUE)
+	if(!attached_note)
+		return ..()
+	var/obj/item/pinned = attached_note
+	pinned.moveToNullspace()
+	. = ..()
+	if(!QDELETED(pinned))
+		pinned.forceMove(src)
+
+/obj/structure/closet/body_bag/Destroy()
+	if(attached_note)
+		var/obj/item/pinned = attached_note
+		set_attached_note(null)
+		pinned.forceMove(drop_location())
+	return ..()
 
 /obj/structure/closet/body_bag/update_overlays()
 	. = ..()
-	if (tagged)
+	if(tagged || attached_note)
 		. += "bodybag_label"
+
+/obj/structure/closet/body_bag/AltClick(mob/user)
+	if(attached_note && user.canUseTopic(src, BE_CLOSE))
+		add_fingerprint(user)
+		remove_attached_note(user)
+		return TRUE
+	return ..()
 
 /obj/structure/closet/body_bag/close()
 	if(..())
@@ -59,6 +164,9 @@
 	. = ..()
 	if(over_object == usr && Adjacent(usr) && (in_range(src, usr) || usr.contents.Find(src)))
 		if(!ishuman(usr))
+			return FALSE
+		if(attached_note)
+			to_chat(usr, span_warning("Снимите [attached_note] с [src] перед складыванием!"))
 			return FALSE
 		if(contents.len)
 			return FALSE
@@ -85,8 +193,13 @@
 
 /obj/structure/closet/body_bag/bluespace/MouseDrop(over_object, src_location, over_location)
 	. = ..()
+	if(QDELETED(src)) // родитель уже сложил пустой мешок и удалил src - второй складывать нечего
+		return .
 	if(over_object == usr && Adjacent(usr) && (in_range(src, usr) || usr.contents.Find(src)))
 		if(!ishuman(usr))
+			return FALSE
+		if(attached_note)
+			to_chat(usr, span_warning("Снимите [attached_note] с [src] перед складыванием!"))
 			return FALSE
 		if(contents.len >= mob_storage_capacity / 2)
 			to_chat(usr, span_warning("Для складывания [src] внутри находится слишком много вещей!"))
@@ -145,12 +258,8 @@
 		to_chat(the_folder, span_warning("You wrestle with [src], but it won't fold while its straps are fastened."))
 	return ..()
 
-/obj/structure/closet/body_bag/containment/prisoner/update_icon()
-	. = ..()
-	if(sinched)
-		icon_state = initial(icon_state) + "_sinched"
-	else
-		icon_state = initial(icon_state)
+/obj/structure/closet/body_bag/containment/prisoner/bag_icon_suffix()
+	return sinched ? "_sinched" : ""
 
 /obj/structure/closet/body_bag/containment/prisoner/Entered(atom/movable/AM, atom/oldLoc)
 	. = ..()
@@ -159,6 +268,7 @@
 		ADD_TRAIT(AM, TRAIT_RESISTLOWPRESSURE, REF(src))
 		ADD_TRAIT(AM, TRAIT_RESISTHEAT, REF(src))
 		ADD_TRAIT(AM, TRAIT_RESISTCOLD, REF(src))
+		ADD_TRAIT(AM, TRAIT_NOBREATH, REF(src))
 
 /obj/structure/closet/body_bag/containment/prisoner/Exited(atom/movable/AM, atom/newLoc)
 	. = ..()

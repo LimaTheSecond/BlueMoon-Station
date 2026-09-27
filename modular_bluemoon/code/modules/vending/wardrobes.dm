@@ -58,6 +58,8 @@
 		/obj/item/clothing/mask/balaclava/breath/alliance = 6,
 		/obj/item/clothing/mask/gas/sechailer = 4,
 		/obj/item/clothing/mask/gas/nri = 2,
+		/obj/item/clothing/head/warden/campaignhat = 5,
+		/obj/item/clothing/under/rank/security/officer/blueshirt/seccorp/deputysheriff = 5,
 		/obj/item/clothing/under/rank/security/officer/skirt = 5,
 		/obj/item/clothing/under/rank/security/officer/grey = 5,
 		/obj/item/clothing/under/rank/security/officer/tacticool = 3,
@@ -75,6 +77,7 @@
 		/obj/item/clothing/suit/armor/secjacket = 5,
 		/obj/item/clothing/under/rank/security/officer/util = 5,
 		/obj/item/clothing/under/rank/security/officer/blueshirt/seccorp = 5,
+		/obj/item/clothing/under/rank/security/officer/blueshirt/seccorp/deputysheriff = 5,
 		/obj/item/clothing/neck/cloak/security = 6,
 		/obj/item/clothing/head/beret/sec/peacekeeper/cap = 5,
 		/obj/item/clothing/head/beret/sec/peacekeeper = 5,
@@ -275,6 +278,7 @@
 		/obj/item/clothing/mask/balaclava/breath/redscarf/yellowscarf = 4,
 		/obj/item/radio/headset/headset_cargo = 3,
 		/obj/item/mailmat_deployer = 3,
+		/obj/item/mod/construction/armor/cargo_worker = 3,
 	)
 	premium = list(
 		/obj/item/clothing/head/mailman = 1,
@@ -579,7 +583,7 @@
 	vend_reply = "Спасибо за использование DeusVend!"
 	products = list(
 		/obj/item/choice_beacon/holy = 1,
-		/obj/item/staff/bostaff/chaplain = 1,
+		// /obj/item/staff/bostaff/chaplain = 1,
 		/obj/item/storage/backpack/cultpack = 2,
 		/obj/item/clothing/accessory/pocketprotector/cosmetology = 2,
 		/obj/item/clothing/under/rank/civilian/chaplain = 2,
@@ -772,6 +776,8 @@
 					/obj/item/clothing/under/bm/caprevskirt = 2, // BlueMoon Add
 					/obj/item/clothing/under/bm/regaloutfit = 2, // BlueMoon Add
 					/obj/item/clothing/suit/captunic = 1,
+					/obj/item/clothing/suit/toggle/captains_parade/syndicate/winter = 1, // BlueMoon Add
+					/obj/item/clothing/suit/toggle/captains_parade/syndicate = 1, // BlueMoon Add
 					/obj/item/clothing/under/rank/captain/femformal = 2,
 					/obj/item/clothing/glasses/sunglasses/gar/supergar = 1,
 					/obj/item/clothing/gloves/color/captain = 1,
@@ -1070,6 +1076,8 @@
 		/obj/item/clothing/under/rank/security/head_of_security/parade/female = 1,
 		/obj/item/clothing/under/rank/security/head_of_security/parade = 1,
 		/obj/item/clothing/under/rank/security/officer/blueshirt/seccorp/hoscorp = 1,
+		/obj/item/clothing/head/warden/campaignhat = 1,
+		/obj/item/clothing/under/rank/security/officer/blueshirt/seccorp/sheriff = 1,
 		/obj/item/clothing/under/rank/security/head_of_security/skirt = 1,
 		/obj/item/clothing/under/rank/security/head_of_security/alt = 1,
 		/obj/item/clothing/under/rank/security/head_of_security/alt/skirt = 1,

@@ -96,7 +96,7 @@
 /obj/effect/turf_decal{
 	icon_state = "warningline_white"
 	},
-/obj/machinery/suit_storage_unit/inteq_spacesuit,
+/obj/machinery/suit_storage_unit/syndicate/softsuit,
 /turf/open/floor/pod/dark,
 /area/ruin/space/has_grav/powered/infestedship)
 "bJ" = (
@@ -658,7 +658,7 @@
 	welded = 1;
 	dir = 4
 	},
-/mob/living/simple_animal/hostile/syndicate/ranged/shotgun/space,
+/mob/living/simple_animal/hostile/inteq/ranged/shotgun/space,
 /turf/open/floor/mineral/plastitanium/yellow,
 /area/ruin/space/has_grav/powered/infestedship)
 "kT" = (
@@ -1651,7 +1651,7 @@
 /turf/open/floor/mineral/plastitanium,
 /area/ruin/space/has_grav/powered/infestedship)
 "yZ" = (
-/obj/structure/window/shuttle/survival_pod/spawner,
+/obj/structure/window/reinforced/survival_pod,
 /turf/open/floor/plating,
 /area/ruin/space/has_grav/powered/infestedship)
 "zf" = (
@@ -1696,10 +1696,11 @@
 /turf/open/floor/plating/airless,
 /area/ruin/space/has_grav/powered/infestedship)
 "zV" = (
-/obj/machinery/suit_storage_unit/open,
 /obj/effect/turf_decal{
 	icon_state = "warningline_white"
 	},
+/obj/machinery/suit_storage_unit/syndicate/softsuit,
+/obj/machinery/suit_storage_unit/syndicate/softsuit,
 /turf/open/floor/pod/dark,
 /area/ruin/space/has_grav/powered/infestedship)
 "Ah" = (

@@ -18,10 +18,13 @@
 	port = null
 	return ..()
 
-/datum/shuttle_event/proc/start_up_event(evacuation_duration)
+/datum/shuttle_event/proc/start_up_event(evacuation_duration, immediate = FALSE)
 	if(!evacuation_duration)
 		evacuation_duration = 1
-	activate_at = world.time + evacuation_duration * activation_fraction
+	if(immediate)
+		activate_at = world.time
+	else
+		activate_at = world.time + evacuation_duration * activation_fraction
 
 /// Called when the event begins affecting the shuttle
 /datum/shuttle_event/proc/activate()
@@ -152,6 +155,10 @@
 	// TRAIT_FREE_HYPERSPACE_MOVEMENT and skip/stop hyperspace drift — carp, humans, debris would pile up at the spawn edge.
 	// Meteors/projectiles use anchored or their own motion; use TRAIT_FREE_HYPERSPACE_MOVEMENT there when needed.
 	ADD_TRAIT(spawnee, TRAIT_DEL_ON_SPACE_DUMP, INNATE_TRAIT)
+	// Simple animals spawned by shuttle events are clickable by ghosts (gondola/pet-style possession).
+	if(istype(spawnee, /mob/living/simple_animal))
+		var/mob/living/simple_animal/simple = spawnee
+		simple.playable_by_ghost = TRUE
 	// Defer cling: synchronous AddComponent in the same tick as SSshuttle.fire was stalling MC (DEFCON).
 	if(ismovable(spawnee) && !spawnee.anchored && istype(get_turf(spawnee), /turf/open/space/transit))
 		addtimer(CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(deferred_init_shuttle_cling_for_event), WEAKREF(spawnee)), 1)
@@ -188,9 +195,7 @@ GLOBAL_LIST_INIT(admin_forceable_hyperspace_events, list())
 
 /proc/get_admin_forceable_hyperspace_events()
 	if(!length(GLOB.admin_forceable_hyperspace_events))
-		var/list/collected = collect_admin_forceable_hyperspace_events()
-		if(length(collected))
-			GLOB.admin_forceable_hyperspace_events = collected
+		GLOB.admin_forceable_hyperspace_events = collect_admin_forceable_hyperspace_events()
 	return GLOB.admin_forceable_hyperspace_events
 
 /proc/collect_admin_forceable_hyperspace_events()

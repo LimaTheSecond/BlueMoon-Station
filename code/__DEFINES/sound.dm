@@ -468,7 +468,7 @@ GLOBAL_LIST_INIT(otherworld_sounds, list(
 		'modular_bluemoon/sound/effects/re-zero.ogg',
 		'modular_bluemoon/sound/effects/robot_bump.ogg',
 		'modular_bluemoon/sound/effects/robot_sit.ogg',
-		'modular_bluemoon/sound/effects/snap.ogg',
+		'sound/effects/snap.ogg',
 		'modular_bluemoon/sound/effects/soft_ping.ogg',
 		'modular_bluemoon/sound/effects/spook.ogg',
 		'modular_bluemoon/sound/effects/squishy.ogg',
@@ -583,9 +583,9 @@ GLOBAL_LIST_INIT(otherworld_sounds, list(
 		'modular_bluemoon/sound/emotes/laugh_male_7.ogg',
 		'modular_bluemoon/sound/emotes/malf.ogg',
 		'modular_bluemoon/sound/emotes/mar.ogg',
-		'modular_bluemoon/sound/emotes/meow4.ogg',
-		'modular_bluemoon/sound/emotes/meow5.ogg',
-		'modular_bluemoon/sound/emotes/meow6.ogg',
+		'sound/mobs/non-humanoids/cat/cat_meow1.ogg',
+		'sound/mobs/non-humanoids/cat/cat_meow2.ogg',
+		'sound/mobs/non-humanoids/cat/cat_meow3.ogg',
 		'modular_bluemoon/sound/emotes/meow7_1.ogg',
 		'modular_bluemoon/sound/emotes/meow7_2.ogg',
 		'modular_bluemoon/sound/emotes/meow7_3.ogg',
@@ -731,7 +731,7 @@ GLOBAL_LIST_INIT(otherworld_sounds, list(
 		'modular_bluemoon/sound/plush/tiamat_meow1.ogg',
 		'modular_bluemoon/sound/plush/tiamat_meow2.ogg',
 		'modular_bluemoon/sound/plush/tiamat_meow3.ogg',
-		'modular_bluemoon/sound/plush/tiamat_mrrp1.ogg',
+		'modular_splurt/sound/voice/catpeople/cat_mrrp1.ogg',
 		'modular_bluemoon/sound/plush/tiamat_mrrp2.ogg',
 		'modular_bluemoon/sound/plush/vinc_bleh.ogg',
 		'modular_bluemoon/sound/plush/vinc_fahhh.ogg',
@@ -860,3 +860,10 @@ GLOBAL_LIST_EMPTY(sfx_datum_by_key)
 #define SFX_BANDAGE_END "bandage_end"
 #define SFX_REMOTE_MODE_SWITCH "remote_mode_switch"
 #define SFX_REMOTE_ACTION "remote_action"
+#define SFX_WRITING_PEN "writing_pen"
+
+/// Сколько разных пар (envdry, envwet) держит кэш эха sound_echo_for(). Пар в коде ровно
+/// две: дефолтная и та, что подставляет audiovisual_redirect. Запас - на звук с ручным
+/// ревербом; всё сверх запаса строится как раньше, и это оставляет кэш ограниченным при
+/// любом вызывающем.
+#define SOUND_ECHO_CACHE_MAX 16

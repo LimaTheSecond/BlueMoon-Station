@@ -15,6 +15,25 @@
 	icon_state = "blahaj"
 	attack_verb = list("gnawed", "gnashed", "chewed")
 	squeak_override = list('modular_bluemoon/sound/voice/rawr.ogg' = 1)
+	can_random_spawn = FALSE
+
+/obj/item/toy/plush/bm/shark/box_reskinnable
+	name = "Reskinnable Shark Plushie"
+	icon_state = "blahaj-uni"
+	can_random_spawn = TRUE
+	unique_reskin = list(
+		RESKIN_EMPTY
+	)
+
+/obj/item/toy/plush/bm/shark/box_reskinnable/Initialize(mapload, set_snowflake_id)
+	// Возвращаем вид изначальной игрушки
+	name = /obj/item/toy/plush/bm/shark::name
+	icon_state = /obj/item/toy/plush/bm/shark::icon_state
+	// Записываем все подтипы в рескины
+	for(var/sub_type in subtypesof(/obj/item/toy/plush/bm/shark) - type)
+		unique_reskin[sub_type:name] = list("name" = sub_type:name, RESKIN_ICON_STATE = sub_type:icon_state)
+
+	return ..()
 
 /obj/item/toy/plush/bm/shark/grey
 	name = "Shark Grey Plushie"
@@ -120,7 +139,7 @@
 	squeak_override = list(
 		'modular_splurt/sound/voice/mrowl.ogg' = 1,
 		'modular_splurt/sound/voice/meow_meme.ogg' = 1,
-		'modular_bluemoon/sound/plush/tiamat_mrrp1.ogg' = 1,
+		'modular_splurt/sound/voice/catpeople/cat_mrrp1.ogg' = 1,
 		'modular_bluemoon/sound/plush/tiamat_mrrp2.ogg' = 1,
 		'modular_bluemoon/sound/plush/tiamat_meow1.ogg' = 1,
 		'modular_bluemoon/sound/plush/tiamat_meow2.ogg' = 1,
@@ -165,7 +184,7 @@
 	desc = " Мягкая игрушка в форме кошки легко утолит вашу жажду объятий и ласки, от неё вы можете почувствовать легкий аромат пепла и сладковато ягодного вкуса."
 	icon_state = "laska"
 	squeak_override = list(
-		'modular_bluemoon/sound/plush/tiamat_mrrp1.ogg' = 1,
+		'modular_splurt/sound/voice/catpeople/cat_mrrp1.ogg' = 1,
 		'modular_bluemoon/sound/plush/tiamat_mrrp2.ogg' = 1,
 		'modular_bluemoon/sound/plush/tiamat_meow1.ogg' = 1
 	)
@@ -752,7 +771,7 @@
 	name = "Vox plushie"
 	desc = "Тот самый пернатый ублюдок, которого все ненавидят, но только не вы."
 	icon_state = "vox"
-	squeak_override = list('modular_splurt/sound/voice/shriek1.ogg' = 1)
+	squeak_override = list('sound/voice/shriek1.ogg' = 1)
 
 /obj/item/toy/plush/bm/expie
 	name = "Expie plushie"
@@ -966,3 +985,88 @@ GLOBAL_VAR_INIT(plush_reijo_mickie_active, 0)
 	desc = "Мягкая и приятная на ощупь игрушка важного рыжего лиса в пальто."
 	icon_state = "vulpix"
 	squeak_override = list('sound/fox/Voice/fox_trill_2.ogg' = 1)
+
+#define BASIC_GIZI_SKIN "Gizi Plushie"
+#define ALT_GIZI_SKIN "Gizi-mini Plushie"
+
+/obj/item/toy/plush/bm/gizi
+	name = BASIC_GIZI_SKIN
+	desc = "Игрушка от которой пахнет сигаретным дымом и вайбом старого времени."
+	icon_state = "gizi"
+	item_state = "gizi"
+	squeak_override = list('modular_bluemoon/sound/plush/gizi.ogg' = 1)
+	always_reskinnable = TRUE
+	unique_reskin = list(
+		BASIC_GIZI_SKIN = list(RESKIN_ICON_STATE = "gizi"),
+		ALT_GIZI_SKIN = list(RESKIN_ICON_STATE = "gizi_mini"),
+	)
+
+/obj/item/toy/plush/bm/gizi/reskin_obj(mob/user)
+	. = ..()
+	name = current_skin
+	if(ismob(loc))
+		var/mob/M = loc
+		M.update_inv_hands()
+
+#undef BASIC_GIZI_SKIN
+#undef ALT_GIZI_SKIN
+
+#define BASIC_ARIRAL_SKIN "Ariral Plushie"
+#define ALT_ARIRAL_SKIN "Ariral-mini Plushie"
+
+/obj/item/toy/plush/bm/ariral
+	name = BASIC_ARIRAL_SKIN
+	desc = "Voiding..."
+	icon_state = "ariral"
+	item_state = "ariral"
+	squeak_override = list('modular_bluemoon/sound/plush/gizi.ogg' = 1)
+	always_reskinnable = TRUE
+	unique_reskin = list(
+		BASIC_ARIRAL_SKIN = list(RESKIN_ICON_STATE = "ariral"),
+		ALT_ARIRAL_SKIN = list(RESKIN_ICON_STATE = "ariral_mini"),
+	)
+
+/obj/item/toy/plush/bm/ariral/reskin_obj(mob/user)
+	. = ..()
+	name = current_skin
+	if(ismob(loc))
+		var/mob/M = loc
+		M.update_inv_hands()
+
+#undef BASIC_ARIRAL_SKIN
+#undef ALT_ARIRAL_SKIN
+
+/obj/item/toy/plush/bm/tau
+	name = "Tau Plushie"
+	desc = "Sauce"
+	icon_state = "tau"
+	squeak_override = list('modular_bluemoon/sound/emotes/snakedies.ogg' = 1)
+	can_you_fuck_plush = FALSE
+
+/obj/item/toy/plush/bm/tau/emag_act()
+	. = ..()
+	icon_state = "tau_alt" //so much true/// it's a crime https://klipy.com/gifs/true-true-true-1
+
+/obj/item/toy/plush/bm/reno
+	name = "Reno Plush"
+	desc = "The perfect organism... now in a perfectly compact, cozy shape."
+	icon_state = "reno"
+	squeak_override = list('modular_bluemoon/sound/plush/xeno1.ogg' = 50, 'modular_bluemoon/sound/plush/xeno2.ogg' = 50)
+
+/obj/item/toy/plush/bm/surstruming
+	name = "Surstruming Plush"
+	desc = "DISGUSTING!!! WHO EVEN CREATED THIS SHIT!?"
+	icon_state = "surstromming"
+	squeak_override = list('modular_bluemoon/sound/plush/surstromming1.ogg' = 20, 'modular_bluemoon/sound/plush/surstromming2.ogg' = 20, 'modular_bluemoon/sound/plush/surstromming3.ogg' = 20, 'modular_bluemoon/sound/plush/surstromming4.ogg' = 20, 'modular_bluemoon/sound/plush/surstromming5.ogg' = 20)
+
+/obj/item/toy/plush/bm/flka
+	name = "Fl-ka Plush"
+	desc = "A worn-out toy Created in the Dyson Sphere"
+	icon_state = "flka"
+	squeak_override = list('modular_bluemoon/sound/plush/xeno_roar.ogg' = 33, 'modular_bluemoon/sound/plush/xeno1.ogg' = 33, 'modular_bluemoon/sound/plush/xeno2.ogg' = 33)
+
+/obj/item/toy/plush/bm/pig
+	name = "Pig plush"
+	desc = "Dementyi's pig"
+	icon_state = "pig"
+	squeak_override = list('modular_bluemoon/sound/plush/pig1.ogg' = 20, 'modular_bluemoon/sound/plush/pig2.ogg' = 20, 'modular_bluemoon/sound/plush/pig3.ogg' = 20, 'modular_bluemoon/sound/plush/pig4.ogg' = 20, 'modular_bluemoon/sound/plush/pig5.ogg' = 20)

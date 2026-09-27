@@ -1,6 +1,18 @@
 //These procs handle putting s tuff in your hands
 //as they handle all relevant stuff like adding it to the player's screen and updating their overlays.
 
+/// Снимает предмет со всех экранов, куда его положил инвентарь: со своего и с экранов
+/// орбитящих нас гостов. Наблюдателям предмет выдаёт update_inv_hands() и
+/// update_observer_view(), а снимал его раньше только владелец - запись в client.screen
+/// госта переживала qdel предмета и держала его до конца раунда.
+/mob/proc/remove_from_hud_screens(obj/item/I)
+	if(isnull(I))
+		return
+	if(client)
+		client.screen -= I
+	for(var/mob/dead/observe as anything in observers)
+		observe.client?.screen -= I
+
 //Returns the thing we're currently holding
 /mob/proc/get_active_held_item()
 	return get_item_for_held_index(active_hand_index)
@@ -45,8 +57,8 @@
 //Rights:2, 4, 6, 8...
 /mob/proc/get_empty_held_index_for_side(side = "left", all = FALSE)
 	var/start = 0
-	var/static/list/lefts = list("l" = TRUE,"L" = TRUE,"LEFT" = TRUE,"left" = TRUE)
-	var/static/list/rights = list("r" = TRUE,"R" = TRUE,"RIGHT" = TRUE,"right" = TRUE) //"to remain silent"
+	var/static/list/lefts = list("l" = TRUE,"L" = TRUE,"LEFT" = TRUE,"left" = TRUE, BODY_ZONE_L_ARM = TRUE)
+	var/static/list/rights = list("r" = TRUE,"R" = TRUE,"RIGHT" = TRUE,"right" = TRUE, BODY_ZONE_R_ARM = TRUE) //"to remain silent"
 	if(lefts[side])
 		start = 1
 	else if(rights[side])
@@ -169,6 +181,12 @@
 	return !held_items[hand_index]
 
 /mob/proc/put_in_hand(obj/item/I, hand_index, forced = FALSE, ignore_anim = TRUE)
+	// Класть в руки удалённый предмет нельзя: forced = TRUE обходит can_put_in_hand целиком, и
+	// стрип-меню приносило сюда самоудаляющиеся при снятии предметы (энергетический силок,
+	// поцелуй) - forceMove мертвецу пинил его ссылкой из contents и давал "doMove qdel-нутого"
+	// (прод-раунд 9834). Сторона сброса такой гард уже имеет.
+	if(QDELETED(I))
+		return FALSE
 	if(forced || can_put_in_hand(I, hand_index))
 		if(isturf(I.loc) && !ignore_anim)
 			I.do_pickup_animation(src)
@@ -200,6 +218,12 @@
 /mob/proc/put_in_r_hand(obj/item/I)
 	return put_in_hand(I, get_empty_held_index_for_side("r"))
 
+/mob/proc/calculate_emply_hand_slots()
+	var/empty_hand_count
+	for(var/item in held_items)
+		if(!item)
+			empty_hand_count++
+	return empty_hand_count
 
 /mob/proc/put_in_hand_check(obj/item/I)
 	if(incapacitated() && !(I.item_flags&ABSTRACT)) //Cit change - Changes lying to incapacitated so that it's plausible to pick things up while on the ground
@@ -207,7 +231,6 @@
 	if(!istype(I))
 		return FALSE
 	return TRUE
-
 
 //Puts the item into our active hand if possible. returns TRUE on success.
 /mob/proc/put_in_active_hand(obj/item/I, forced = FALSE, ignore_animation = TRUE)
@@ -223,7 +246,10 @@
 //If both fail it drops it on the floor and returns FALSE.
 //This is probably the main one you need to know :)
 /mob/proc/put_in_hands(obj/item/I, del_on_fail = FALSE, merge_stacks = TRUE, forced = FALSE)
-	if(!I)
+	// QDELETED, а не только !I: удалённый предмет остаётся ненулевым, put_in_hand его теперь
+	// отвергает - и управление доходило бы до хвоста прока, где удалённому предмету всё равно
+	// делают forceMove(drop_location()) и dropped(). Тот же рантайм, только этажом ниже.
+	if(QDELETED(I))
 		return FALSE
 
 	// If the item is a stack and we're already holding a stack then merge
@@ -331,15 +357,18 @@
 	if(HAS_TRAIT(I, TRAIT_NODROP) && !force)
 		return FALSE
 
-	I.randomize_pixel_position()
-
 	var/hand_index = get_held_index_of_item(I)
 	if(hand_index)
 		held_items[hand_index] = null
 		update_inv_hands()
-	if(I)
-		if(client)
-			client.screen -= I
+
+	remove_from_hud_screens(I)
+	//QDELETED сюда доезжает через оффхенд двуручника: /obj/item/Destroy снимает
+	//DROPDEL "чтобы не было реqdel'ов", и следующий сброс из рук честно тащит
+	//труп на пол - "doMove qdel-нутого /obj/item/offhand". У такого предмета
+	//Destroy уже отработал: править ему внешность, двигать его и звать dropped()
+	//значит работать с трупом. Снять с экрана всё равно надо - ссылка переживает qdel
+	if(!QDELETED(I))
 		I.screen_loc = null
 		I.layer = initial(I.layer)
 		I.plane = initial(I.plane)
@@ -349,6 +378,8 @@
 				I.moveToNullspace()
 			else
 				I.forceMove(newloc)
+				if(isturf(newloc))
+					I.randomize_pixel_position(dropped_by = src)
 		on_item_dropped(I)
 		if(I.dropped(src) == ITEM_RELOCATED_BY_DROPPED)
 			return FALSE

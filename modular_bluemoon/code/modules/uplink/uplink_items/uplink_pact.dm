@@ -6,7 +6,7 @@
 	purchasable_from = UPLINK_SYNDICATE_PACT_CREW
 
 /datum/uplink_item/pact/pact_ninja_case
-	name = "Pact Ninja Case"
+	name = "PACT Ninja Case"
 	desc = "Хранит в себе специализированный боевой костюм с оружием ближнего боя"
 	item = /obj/item/storage/toolbox/infiltrator/pact_ninja
 	cost = 5
@@ -226,3 +226,10 @@
 
 /obj/item/autosurgeon/syndicate/high_intensity_photon_projector
 	starting_organ = /obj/item/organ/cyberimp/arm/flash
+
+/datum/uplink_item/stealthy_weapons/telescopic_baton
+	name = "Telescopic Baton"
+	desc = "A compact yet robust personal defense weapon. Can be concealed when folded."
+	item = /obj/item/melee/classic_baton/telescopic
+	purchasable_from = UPLINK_SYNDICATE | UPLINK_SYNDICATE | UPLINK_SYNDICATE_PACT_CREW
+	cost = 5

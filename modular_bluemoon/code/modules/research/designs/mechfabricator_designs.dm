@@ -18,6 +18,15 @@
 	construction_time = 120
 	category = list("Cyborg Upgrade Modules")
 
+/datum/design/borg_upgrade_alien_combi_med_tools
+	name = "Cyborg Upgrade (Alien Combi Surgery Tools)"
+	id = "borg_upgrade_alien_combi_med_tools"
+	build_type = MECHFAB
+	build_path = /obj/item/borg/upgrade/advmed_tools/alien
+	materials = list(/datum/material/iron = 22500, /datum/material/glass = 4200, /datum/material/plasma = 3500, /datum/material/silver = 7000, /datum/material/gold = 6000, /datum/material/titanium = 8000)
+	construction_time = 120
+	category = list("Cyborg Upgrade Modules")
+
 /datum/design/borg_upgrade_syndircd
 	name = "Cyborg Upgrade (Advanced RCD Module)"
 	id = "borg_upgrade_syndircd"
@@ -34,6 +43,15 @@
 	build_path = /obj/item/borg/upgrade/gasanalyzer_advanced
 	materials = list(/datum/material/iron = 2000, /datum/material/glass = 1000, /datum/material/uranium = 1000, /datum/material/gold = 200, /datum/material/diamond = 100)
 	construction_time = 120
+	category = list("Cyborg Upgrade Modules")
+
+/datum/design/borg_dominatrix
+	name = "Cyborg Upgrade (Dominatrix Module)"
+	id = "borg_dominatrix"
+	build_type = MECHFAB
+	build_path = /obj/item/borg/upgrade/dominatrix_module
+	materials = list(/datum/material/iron = 35000, /datum/material/glass = 10000)
+	construction_time = 12 SECONDS
 	category = list("Cyborg Upgrade Modules")
 
 /////////////////////////////////////////////////
